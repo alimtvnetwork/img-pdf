@@ -79,7 +79,7 @@ if ($git) {
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 }
 
-$script = Join-Path $InstallDir "src\jpg2pdf.py"
+$script = Join-Path $InstallDir "tools\jpg2pdf\src\jpg2pdf.py"
 $reqs   = Join-Path $InstallDir "requirements.txt"
 if (-not (Test-Path $script)) { Die "Missing $script" }
 

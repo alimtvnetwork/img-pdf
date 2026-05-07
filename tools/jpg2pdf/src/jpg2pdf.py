@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 from PIL import Image
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 PAGE_SIZES = {  # points (1/72 inch)
     "a4":     (595.28, 841.89),
@@ -50,23 +50,28 @@ def collect_from_list(paths):
 
 
 def make_page(img_path: Path, page_w_pt: float, page_h_pt: float,
-              fit: str, dpi: int, auto_rotate: bool) -> Image.Image:
+              fit: str, dpi: int, auto_rotate: str, rotate: int) -> Image.Image:
     """Render one PDF page at `dpi` DPI.
 
-    All pages keep the SAME orientation (e.g. all A4 portrait). With
-    auto_rotate, an image whose orientation doesn't match the page is rotated
-    90° so it fills the page properly without being shrunk into a tiny strip.
+    rotate:      extra rotation applied to every image (0/90/180/270, CCW).
+    auto_rotate: 'cw'  -> rotate landscape images 90° clockwise to fit portrait page
+                 'ccw' -> rotate 90° counter-clockwise
+                 'off' -> never auto-rotate
     """
     with Image.open(img_path) as im:
         im = im.convert("RGB")
-        iw, ih = im.size
 
-        if auto_rotate:
+        if rotate:
+            im = im.rotate(rotate, expand=True)
+
+        iw, ih = im.size
+        if auto_rotate != "off":
             img_landscape  = iw > ih
             page_landscape = page_w_pt > page_h_pt
             if img_landscape != page_landscape:
-                # Rotate image to match page orientation (lossless 90° turn).
-                im = im.rotate(90, expand=True)
+                # PIL rotates CCW with positive angle.
+                angle = 90 if auto_rotate == "ccw" else -90
+                im = im.rotate(angle, expand=True)
                 iw, ih = im.size
 
         scale = dpi / 72.0
@@ -116,8 +121,13 @@ def main():
                     help="Folder mode: include subfolders")
     ap.add_argument("--dpi", type=int, default=300,
                     help="Render DPI for embedded raster (default: 300)")
+    ap.add_argument("--rotate", type=int, choices=[0, 90, 180, 270], default=0,
+                    help="Rotate every image by N degrees CCW before fitting")
+    ap.add_argument("--auto-rotate", choices=["cw", "ccw", "off"], default="cw",
+                    help="Auto-rotate landscape images to fit portrait page "
+                         "(cw = clockwise, default; ccw = counter-clockwise; off)")
     ap.add_argument("--no-auto-rotate", action="store_true",
-                    help="Don't auto-rotate page to match image orientation")
+                    help="Shortcut for --auto-rotate off")
     args = ap.parse_args()
 
     # ---- Resolve input mode ----
@@ -155,16 +165,18 @@ def main():
 
     out = Path(args.out).expanduser().resolve() if args.out else default_out
 
-    print(f"Files:   {len(images)}")
-    print(f"Page:    {args.size} {args.orientation} ({int(w)}x{int(h)} pt) @ {args.dpi} DPI")
-    print(f"Fit:     {args.fit}  auto-rotate: {not args.no_auto_rotate}")
-    print(f"Output:  {out}")
+    auto_rot = "off" if args.no_auto_rotate else args.auto_rotate
+
+    print(f"Files:    {len(images)}")
+    print(f"Page:     {args.size} {args.orientation} ({int(w)}x{int(h)} pt) @ {args.dpi} DPI")
+    print(f"Fit:      {args.fit}  rotate: {args.rotate}  auto-rotate: {auto_rot}")
+    print(f"Output:   {out}")
 
     pages = []
     for i, p in enumerate(images, 1):
         print(f"  [{i}/{len(images)}] {p.name}")
         pages.append(make_page(p, w, h, args.fit, args.dpi,
-                               auto_rotate=not args.no_auto_rotate))
+                               auto_rotate=auto_rot, rotate=args.rotate))
 
     pages[0].save(out, "PDF", resolution=float(args.dpi),
                   save_all=True, append_images=pages[1:])

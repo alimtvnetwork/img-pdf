@@ -115,14 +115,22 @@ function Build-Submenu {
     }
 
     if ($Mode -eq 'Folder') {
-        _add "01_A4"     "Convert All to A4"              '--size a4 "%V"'
-        _add "02_Letter" "Convert All to Letter"          '--size letter "%V"'
-        _add "03_Legal"  "Convert All to Legal"           '--size legal "%V"'
-        _add "04_A4_R"   "Convert All to A4 (recursive)"  '--size a4 --recursive "%V"'
+        _add "01_A4"      "Convert All to A4"                       '--size a4 "%V"'
+        _add "02_Letter"  "Convert All to Letter"                   '--size letter "%V"'
+        _add "03_Legal"   "Convert All to Legal"                    '--size legal "%V"'
+        _add "04_A4_R"    "Convert All to A4 (recursive)"           '--size a4 --recursive "%V"'
+        _add "05_A4_CW"   "Convert All to A4 (rotate 90 CW)"        '--size a4 --rotate 270 "%V"'
+        _add "06_A4_CCW"  "Convert All to A4 (rotate 90 CCW)"       '--size a4 --rotate 90  "%V"'
+        _add "07_A4_180"  "Convert All to A4 (rotate 180)"          '--size a4 --rotate 180 "%V"'
+        _add "08_A4_NOAR" "Convert All to A4 (no auto-rotate)"      '--size a4 --no-auto-rotate "%V"'
     } else {
-        _add "11_A4"     "Convert Selected to A4"         '--size a4 --files %*'
-        _add "12_Letter" "Convert Selected to Letter"     '--size letter --files %*'
-        _add "13_Legal"  "Convert Selected to Legal"      '--size legal --files %*'
+        _add "11_A4"      "Convert Selected to A4"                  '--size a4 --files %*'
+        _add "12_Letter"  "Convert Selected to Letter"              '--size letter --files %*'
+        _add "13_Legal"   "Convert Selected to Legal"               '--size legal --files %*'
+        _add "15_A4_CW"   "Convert Selected to A4 (rotate 90 CW)"   '--size a4 --rotate 270 --files %*'
+        _add "16_A4_CCW"  "Convert Selected to A4 (rotate 90 CCW)"  '--size a4 --rotate 90  --files %*'
+        _add "17_A4_180"  "Convert Selected to A4 (rotate 180)"     '--size a4 --rotate 180 --files %*'
+        _add "18_A4_NOAR" "Convert Selected to A4 (no auto-rotate)" '--size a4 --no-auto-rotate --files %*'
     }
 }
 

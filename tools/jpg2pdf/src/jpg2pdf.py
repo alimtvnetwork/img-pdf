@@ -14,6 +14,8 @@ import sys
 from pathlib import Path
 from PIL import Image
 
+__version__ = "0.2.0"
+
 PAGE_SIZES = {  # points (1/72 inch)
     "a4":     (595.28, 841.89),
     "letter": (612.00, 792.00),

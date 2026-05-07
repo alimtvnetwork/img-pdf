@@ -80,7 +80,7 @@ if ($git) {
 }
 
 $script = Join-Path $InstallDir "tools\jpg2pdf\src\jpg2pdf.py"
-$reqs   = Join-Path $InstallDir "requirements.txt"
+$reqs   = Join-Path $InstallDir "tools\jpg2pdf\requirements.txt"
 if (-not (Test-Path $script)) { Die "Missing $script" }
 
 # ---------- 4. Pillow ----------

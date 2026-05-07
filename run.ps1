@@ -322,7 +322,8 @@ if (-not $NoContextMenu) {
         Warn "Missing $regScript — skipping context-menu registration."
     } else {
         Info "Registering Explorer context menu..."
-        & powershell -NoProfile -ExecutionPolicy Bypass -File $regScript -ExePath $entryPath
+        Invoke-Logged -Label "register context menu" -FilePath "powershell" `
+            -ArgumentList @("-NoProfile","-ExecutionPolicy","Bypass","-File",$regScript,"-ExePath",$entryPath)
     }
 }
 
@@ -333,3 +334,5 @@ Write-Host "    jpg2pdf . --size legal --orientation landscape --recursive" -For
 Write-Host ""
 Info "Right-click a folder, folder background, or selected images:"
 Write-Host "    Images to PDF >  Convert All / Selected to A4 / Letter / Legal" -ForegroundColor Green
+Write-Host ""
+Info "Full session log: $script:LogFile"

@@ -50,23 +50,28 @@ def collect_from_list(paths):
 
 
 def make_page(img_path: Path, page_w_pt: float, page_h_pt: float,
-              fit: str, dpi: int, auto_rotate: bool) -> Image.Image:
+              fit: str, dpi: int, auto_rotate: str, rotate: int) -> Image.Image:
     """Render one PDF page at `dpi` DPI.
 
-    All pages keep the SAME orientation (e.g. all A4 portrait). With
-    auto_rotate, an image whose orientation doesn't match the page is rotated
-    90° so it fills the page properly without being shrunk into a tiny strip.
+    rotate:      extra rotation applied to every image (0/90/180/270, CCW).
+    auto_rotate: 'cw'  -> rotate landscape images 90° clockwise to fit portrait page
+                 'ccw' -> rotate 90° counter-clockwise
+                 'off' -> never auto-rotate
     """
     with Image.open(img_path) as im:
         im = im.convert("RGB")
-        iw, ih = im.size
 
-        if auto_rotate:
+        if rotate:
+            im = im.rotate(rotate, expand=True)
+
+        iw, ih = im.size
+        if auto_rotate != "off":
             img_landscape  = iw > ih
             page_landscape = page_w_pt > page_h_pt
             if img_landscape != page_landscape:
-                # Rotate image to match page orientation (lossless 90° turn).
-                im = im.rotate(90, expand=True)
+                # PIL rotates CCW with positive angle.
+                angle = 90 if auto_rotate == "ccw" else -90
+                im = im.rotate(angle, expand=True)
                 iw, ih = im.size
 
         scale = dpi / 72.0

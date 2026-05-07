@@ -11,9 +11,14 @@
   .\run.ps1 -NoContextMenu       # skip Explorer registry entries
   .\run.ps1 -Unregister          # remove context menu and exit
   .\run.ps1 -Force               # rebuild .exe even if it already exists
+  .\run.ps1 -Verbose             # stream subprocess output live to the console
+  .\run.ps1 -LogFile C:\my.log   # custom log path (default: %TEMP%\jpg2pdf-logs\run-<timestamp>.log)
 
 .NOTES
   Open a NEW terminal after install so PATH changes take effect.
+  Every winget/git/pip/PyInstaller invocation is captured to the log file with
+  full stdout/stderr; on failure the captured output is also printed to the
+  console so you don't have to re-run to see it.
 #>
 [CmdletBinding()]
 param(
@@ -23,13 +28,90 @@ param(
     [switch]$NoCompile,
     [switch]$NoContextMenu,
     [switch]$Unregister,
-    [switch]$Force
+    [switch]$Force,
+    [switch]$Verbose,                                    # alias for $script:VerboseMode = $true
+    [string]$LogDir      = (Join-Path $env:TEMP "jpg2pdf-logs"),
+    [string]$LogFile     = $null                         # if set, overrides LogDir
 )
 
 $ErrorActionPreference = "Stop"
-function Info($m){ Write-Host "[jpg2pdf] $m" -ForegroundColor Cyan }
-function Warn($m){ Write-Host "[jpg2pdf] $m" -ForegroundColor Yellow }
-function Die ($m){ Write-Host "[jpg2pdf] $m" -ForegroundColor Red; exit 1 }
+
+# ---------- Logging ----------
+$script:VerboseMode = [bool]$Verbose -or ($PSBoundParameters['Verbose'] -eq $true) -or ($VerbosePreference -ne 'SilentlyContinue')
+
+if (-not $LogFile) {
+    New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+    $stamp   = Get-Date -Format "yyyyMMdd-HHmmss"
+    $LogFile = Join-Path $LogDir "run-$stamp.log"
+}
+$script:LogFile = $LogFile
+
+function _Log {
+    param([string]$Level, [string]$Msg)
+    $line = "{0} [{1,-5}] {2}" -f (Get-Date -Format "HH:mm:ss.fff"), $Level, $Msg
+    try { Add-Content -LiteralPath $script:LogFile -Value $line -Encoding UTF8 } catch {}
+}
+function Info($m){ _Log "INFO" $m; Write-Host "[jpg2pdf] $m" -ForegroundColor Cyan }
+function Warn($m){ _Log "WARN" $m; Write-Host "[jpg2pdf] $m" -ForegroundColor Yellow }
+function Die ($m){ _Log "ERROR" $m; Write-Host "[jpg2pdf] $m" -ForegroundColor Red;
+                   Write-Host "[jpg2pdf] Full log: $script:LogFile" -ForegroundColor Red; exit 1 }
+function Verb($m){ _Log "VERB" $m; if ($script:VerboseMode) { Write-Host "[jpg2pdf]   $m" -ForegroundColor DarkGray } }
+
+# Run an external command, tee stdout+stderr to the log file.
+# In verbose mode, stream live to console; otherwise show only on failure.
+function Invoke-Logged {
+    param(
+        [Parameter(Mandatory=$true)][string]$Label,
+        [Parameter(Mandatory=$true)][string]$FilePath,
+        [string[]]$ArgumentList = @(),
+        [switch]$AllowFailure
+    )
+    $argDisplay = ($ArgumentList | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }) -join ' '
+    Verb "$Label -> $FilePath $argDisplay"
+    _Log "RUN" "$FilePath $argDisplay"
+
+    $tmpOut = [IO.Path]::GetTempFileName()
+    $tmpErr = [IO.Path]::GetTempFileName()
+    try {
+        $proc = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList `
+            -NoNewWindow -Wait -PassThru `
+            -RedirectStandardOutput $tmpOut -RedirectStandardError $tmpErr
+        $code = $proc.ExitCode
+
+        $out = if (Test-Path $tmpOut) { Get-Content -Raw -LiteralPath $tmpOut } else { "" }
+        $err = if (Test-Path $tmpErr) { Get-Content -Raw -LiteralPath $tmpErr } else { "" }
+
+        if ($out) { _Log "OUT " "[$Label]`n$out" }
+        if ($err) { _Log "ERR " "[$Label]`n$err" }
+
+        if ($script:VerboseMode) {
+            if ($out) { Write-Host $out }
+            if ($err) { Write-Host $err -ForegroundColor DarkYellow }
+        }
+
+        if ($code -ne 0) {
+            if (-not $script:VerboseMode) {
+                # On failure, dump captured output so the user sees it without re-running.
+                if ($out) { Write-Host "----- stdout -----" -ForegroundColor DarkGray; Write-Host $out }
+                if ($err) { Write-Host "----- stderr -----" -ForegroundColor DarkGray; Write-Host $err -ForegroundColor DarkYellow }
+            }
+            Warn "$Label failed with exit code $code (see $script:LogFile)"
+            if (-not $AllowFailure) { Die "$Label failed (exit $code)." }
+        } else {
+            Verb "$Label OK (exit 0)"
+        }
+        return $code
+    } finally {
+        Remove-Item -LiteralPath $tmpOut,$tmpErr -ErrorAction SilentlyContinue
+    }
+}
+
+Info "Log file: $script:LogFile"
+if ($script:VerboseMode) { Info "Verbose mode ON" }
+
+# Capture environment context up front — invaluable when debugging.
+_Log "ENV " ("PSVersion={0} OS={1} User={2} CWD={3}" -f `
+    $PSVersionTable.PSVersion, [Environment]::OSVersion.VersionString, $env:USERNAME, (Get-Location).Path)
 
 function Get-Python {
     foreach ($n in @("python","py")) {
@@ -65,38 +147,50 @@ if (-not $py) {
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
         Die "winget unavailable. Install Python 3 from https://python.org and re-run."
     }
-    winget install -e --id Python.Python.3.12 --accept-source-agreements --accept-package-agreements
+    Invoke-Logged -Label "winget install Python" -FilePath "winget" -ArgumentList @(
+        "install","-e","--id","Python.Python.3.12",
+        "--accept-source-agreements","--accept-package-agreements"
+    )
     Refresh-Path
     $py = Get-Python
     if (-not $py) { Die "Python installed but not on PATH. Open a new terminal and re-run." }
 }
 Info "Python: $py"
+Invoke-Logged -Label "python --version" -FilePath $py -ArgumentList @("--version") -AllowFailure | Out-Null
 
 # ---------- 2. Git ----------
 $git = Get-Command git -ErrorAction SilentlyContinue
 if (-not $git -and (Get-Command winget -ErrorAction SilentlyContinue)) {
     Info "Git not found. Installing..."
-    winget install -e --id Git.Git --accept-source-agreements --accept-package-agreements
+    Invoke-Logged -Label "winget install Git" -FilePath "winget" -ArgumentList @(
+        "install","-e","--id","Git.Git",
+        "--accept-source-agreements","--accept-package-agreements"
+    )
     Refresh-Path
     $git = Get-Command git -ErrorAction SilentlyContinue
 }
+if ($git) { Verb "git: $($git.Source)" }
 
 # ---------- 3. Pull / clone repo ----------
 if ($localRepo) {
     Info "Using local repo at: $localRepo"
     if ($git -and (Test-Path (Join-Path $localRepo ".git"))) {
         Info "git pull..."
-        try { git -C $localRepo pull --ff-only } catch { Warn "git pull failed (continuing): $_" }
+        Invoke-Logged -Label "git pull" -FilePath $git.Source `
+            -ArgumentList @("-C", $localRepo, "pull", "--ff-only") -AllowFailure | Out-Null
     }
 } elseif ($git) {
     if (Test-Path (Join-Path $InstallDir ".git")) {
         Info "Updating repo in $InstallDir ..."
-        git -C $InstallDir fetch --depth=1 origin $Branch
-        git -C $InstallDir reset --hard "origin/$Branch"
+        Invoke-Logged -Label "git fetch" -FilePath $git.Source `
+            -ArgumentList @("-C",$InstallDir,"fetch","--depth=1","origin",$Branch)
+        Invoke-Logged -Label "git reset" -FilePath $git.Source `
+            -ArgumentList @("-C",$InstallDir,"reset","--hard","origin/$Branch")
     } else {
         Info "Cloning $RepoUrl -> $InstallDir ..."
         New-Item -ItemType Directory -Force -Path (Split-Path $InstallDir) | Out-Null
-        git clone --depth=1 --branch $Branch $RepoUrl $InstallDir
+        Invoke-Logged -Label "git clone" -FilePath $git.Source `
+            -ArgumentList @("clone","--depth=1","--branch",$Branch,$RepoUrl,$InstallDir)
     }
 } else {
     Die "Git unavailable and no local repo. Install Git or run from a cloned copy."
@@ -109,8 +203,10 @@ if (-not (Test-Path $srcScript)) { Die "Missing $srcScript" }
 
 # ---------- 4. Python deps ----------
 Info "Installing Python dependencies..."
-& $py -m pip install --user --upgrade --quiet -r $reqsFile
-if ($LASTEXITCODE -ne 0) { Die "pip install failed." }
+# Drop --quiet so log captures real pip output for troubleshooting.
+$pipArgs = @("-m","pip","install","--user","--upgrade","--disable-pip-version-check","-r",$reqsFile)
+if ($script:VerboseMode) { $pipArgs += "--verbose" }
+Invoke-Logged -Label "pip install -r requirements.txt" -FilePath $py -ArgumentList $pipArgs
 
 # ---------- 5. Compile (PyInstaller) or shim ----------
 $binDir = Join-Path $HOME "Tools\bin"
@@ -133,8 +229,9 @@ if ($NoCompile) {
         Info "jpg2pdf.exe already exists. Use -Force to rebuild."
     } else {
         Info "Installing PyInstaller..."
-        & $py -m pip install --user --upgrade --quiet pyinstaller
-        if ($LASTEXITCODE -ne 0) { Die "Failed to install PyInstaller." }
+        $piInstall = @("-m","pip","install","--user","--upgrade","--disable-pip-version-check","pyinstaller")
+        if ($script:VerboseMode) { $piInstall += "--verbose" }
+        Invoke-Logged -Label "pip install pyinstaller" -FilePath $py -ArgumentList $piInstall
 
         $buildDir = Join-Path $env:TEMP "jpg2pdf_build"
         $distDir  = Join-Path $env:TEMP "jpg2pdf_dist"
@@ -142,11 +239,17 @@ if ($NoCompile) {
         Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $buildDir,$distDir,$workDir
 
         Info "Compiling jpg2pdf.exe (PyInstaller, ~1 min)..."
-        & $py -m PyInstaller --onefile --name jpg2pdf --console `
-            --distpath $distDir --workpath $workDir --specpath $buildDir `
+        $piArgs = @(
+            "-m","PyInstaller","--onefile","--name","jpg2pdf","--console","--noconfirm",
+            "--distpath",$distDir,"--workpath",$workDir,"--specpath",$buildDir,
+            "--log-level", $(if ($script:VerboseMode) { "DEBUG" } else { "WARN" }),
             $srcScript
-        if ($LASTEXITCODE -ne 0) { Die "PyInstaller build failed." }
-        Copy-Item -Force (Join-Path $distDir "jpg2pdf.exe") $exePath
+        )
+        Invoke-Logged -Label "pyinstaller build" -FilePath $py -ArgumentList $piArgs
+
+        $built = Join-Path $distDir "jpg2pdf.exe"
+        if (-not (Test-Path $built)) { Die "PyInstaller finished but $built not found." }
+        Copy-Item -Force $built $exePath
         if (Test-Path $shimPath) { Remove-Item $shimPath -Force }
         Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $buildDir,$distDir,$workDir
         Info "Built: $exePath"
@@ -224,7 +327,8 @@ if (-not $NoContextMenu) {
         Warn "Missing $regScript — skipping context-menu registration."
     } else {
         Info "Registering Explorer context menu..."
-        & powershell -NoProfile -ExecutionPolicy Bypass -File $regScript -ExePath $entryPath
+        Invoke-Logged -Label "register context menu" -FilePath "powershell" `
+            -ArgumentList @("-NoProfile","-ExecutionPolicy","Bypass","-File",$regScript,"-ExePath",$entryPath)
     }
 }
 
@@ -235,3 +339,5 @@ Write-Host "    jpg2pdf . --size legal --orientation landscape --recursive" -For
 Write-Host ""
 Info "Right-click a folder, folder background, or selected images:"
 Write-Host "    Images to PDF >  Convert All / Selected to A4 / Letter / Legal" -ForegroundColor Green
+Write-Host ""
+Info "Full session log: $script:LogFile"

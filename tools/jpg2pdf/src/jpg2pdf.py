@@ -53,22 +53,21 @@ def make_page(img_path: Path, page_w_pt: float, page_h_pt: float,
               fit: str, dpi: int, auto_rotate: bool) -> Image.Image:
     """Render one PDF page at `dpi` DPI.
 
-    page_*_pt are in PostScript points (1/72in). Internal canvas is sized in
-    pixels = pt * dpi / 72 so the embedded raster matches the requested DPI.
-    With auto_rotate, the page swaps to landscape if the image is wider than
-    tall — keeps the source orientation, no cropping.
+    All pages keep the SAME orientation (e.g. all A4 portrait). With
+    auto_rotate, an image whose orientation doesn't match the page is rotated
+    90° so it fills the page properly without being shrunk into a tiny strip.
     """
     with Image.open(img_path) as im:
         im = im.convert("RGB")
         iw, ih = im.size
 
-        # Rotate the *page* (not the image) to match the source orientation
-        # so we don't waste pixels and don't downscale needlessly.
         if auto_rotate:
             img_landscape  = iw > ih
             page_landscape = page_w_pt > page_h_pt
             if img_landscape != page_landscape:
-                page_w_pt, page_h_pt = page_h_pt, page_w_pt
+                # Rotate image to match page orientation (lossless 90° turn).
+                im = im.rotate(90, expand=True)
+                iw, ih = im.size
 
         scale = dpi / 72.0
         canvas_w = max(1, int(round(page_w_pt * scale)))
@@ -81,7 +80,7 @@ def make_page(img_path: Path, page_w_pt: float, page_h_pt: float,
         elif fit == "cover":
             s = max(canvas_w / iw, canvas_h / ih)
             new_w, new_h = int(round(iw * s)), int(round(ih * s))
-        else:  # contain — fit fully inside without upscaling beyond canvas
+        else:  # contain
             s = min(canvas_w / iw, canvas_h / ih)
             new_w, new_h = int(round(iw * s)), int(round(ih * s))
 

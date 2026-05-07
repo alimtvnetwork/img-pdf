@@ -75,6 +75,8 @@ def make_page(img_path: Path, page_w: float, page_h: float, fit: str) -> Image.I
 def main():
     ap = argparse.ArgumentParser(
         description="Combine images into a single PDF.")
+    ap.add_argument("--version", action="version",
+                    version=f"jpg2pdf {__version__}")
     ap.add_argument("folder", nargs="?", default=None,
                     help="Folder of images (omit if using --files / --files-from)")
     ap.add_argument("--files", nargs="+", default=None,

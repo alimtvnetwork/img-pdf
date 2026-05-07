@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 from PIL import Image
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 PAGE_SIZES = {  # points (1/72 inch)
     "a4":     (595.28, 841.89),
@@ -49,27 +49,50 @@ def collect_from_list(paths):
     return out
 
 
-def make_page(img_path: Path, page_w: float, page_h: float, fit: str) -> Image.Image:
-    page = Image.new("RGB", (int(page_w), int(page_h)), "white")
+def make_page(img_path: Path, page_w_pt: float, page_h_pt: float,
+              fit: str, dpi: int, auto_rotate: bool) -> Image.Image:
+    """Render one PDF page at `dpi` DPI.
+
+    page_*_pt are in PostScript points (1/72in). Internal canvas is sized in
+    pixels = pt * dpi / 72 so the embedded raster matches the requested DPI.
+    With auto_rotate, the page swaps to landscape if the image is wider than
+    tall — keeps the source orientation, no cropping.
+    """
     with Image.open(img_path) as im:
         im = im.convert("RGB")
         iw, ih = im.size
+
+        # Rotate the *page* (not the image) to match the source orientation
+        # so we don't waste pixels and don't downscale needlessly.
+        if auto_rotate:
+            img_landscape  = iw > ih
+            page_landscape = page_w_pt > page_h_pt
+            if img_landscape != page_landscape:
+                page_w_pt, page_h_pt = page_h_pt, page_w_pt
+
+        scale = dpi / 72.0
+        canvas_w = max(1, int(round(page_w_pt * scale)))
+        canvas_h = max(1, int(round(page_h_pt * scale)))
+
         if fit == "original":
             new_w, new_h = iw, ih
         elif fit == "stretch":
-            new_w, new_h = int(page_w), int(page_h)
+            new_w, new_h = canvas_w, canvas_h
         elif fit == "cover":
-            s = max(page_w / iw, page_h / ih)
-            new_w, new_h = int(iw * s), int(ih * s)
-        else:  # contain
-            s = min(page_w / iw, page_h / ih)
-            new_w, new_h = int(iw * s), int(ih * s)
+            s = max(canvas_w / iw, canvas_h / ih)
+            new_w, new_h = int(round(iw * s)), int(round(ih * s))
+        else:  # contain — fit fully inside without upscaling beyond canvas
+            s = min(canvas_w / iw, canvas_h / ih)
+            new_w, new_h = int(round(iw * s)), int(round(ih * s))
+
         if (new_w, new_h) != (iw, ih):
             im = im.resize((new_w, new_h), Image.LANCZOS)
-        x = (int(page_w) - new_w) // 2
-        y = (int(page_h) - new_h) // 2
+
+        page = Image.new("RGB", (canvas_w, canvas_h), "white")
+        x = (canvas_w - new_w) // 2
+        y = (canvas_h - new_h) // 2
         page.paste(im, (x, y))
-    return page
+        return page
 
 
 def main():
@@ -92,6 +115,10 @@ def main():
     ap.add_argument("--out", default=None, help="Output PDF path")
     ap.add_argument("--recursive", action="store_true",
                     help="Folder mode: include subfolders")
+    ap.add_argument("--dpi", type=int, default=300,
+                    help="Render DPI for embedded raster (default: 300)")
+    ap.add_argument("--no-auto-rotate", action="store_true",
+                    help="Don't auto-rotate page to match image orientation")
     args = ap.parse_args()
 
     # ---- Resolve input mode ----
@@ -130,16 +157,17 @@ def main():
     out = Path(args.out).expanduser().resolve() if args.out else default_out
 
     print(f"Files:   {len(images)}")
-    print(f"Page:    {args.size} {args.orientation} ({int(w)}x{int(h)} pt)")
-    print(f"Fit:     {args.fit}")
+    print(f"Page:    {args.size} {args.orientation} ({int(w)}x{int(h)} pt) @ {args.dpi} DPI")
+    print(f"Fit:     {args.fit}  auto-rotate: {not args.no_auto_rotate}")
     print(f"Output:  {out}")
 
     pages = []
     for i, p in enumerate(images, 1):
         print(f"  [{i}/{len(images)}] {p.name}")
-        pages.append(make_page(p, w, h, args.fit))
+        pages.append(make_page(p, w, h, args.fit, args.dpi,
+                               auto_rotate=not args.no_auto_rotate))
 
-    pages[0].save(out, "PDF", resolution=72.0,
+    pages[0].save(out, "PDF", resolution=float(args.dpi),
                   save_all=True, append_images=pages[1:])
     print(f"Done -> {out}")
 

@@ -23,13 +23,90 @@ param(
     [switch]$NoCompile,
     [switch]$NoContextMenu,
     [switch]$Unregister,
-    [switch]$Force
+    [switch]$Force,
+    [switch]$Verbose,                                    # alias for $script:VerboseMode = $true
+    [string]$LogDir      = (Join-Path $env:TEMP "jpg2pdf-logs"),
+    [string]$LogFile     = $null                         # if set, overrides LogDir
 )
 
 $ErrorActionPreference = "Stop"
-function Info($m){ Write-Host "[jpg2pdf] $m" -ForegroundColor Cyan }
-function Warn($m){ Write-Host "[jpg2pdf] $m" -ForegroundColor Yellow }
-function Die ($m){ Write-Host "[jpg2pdf] $m" -ForegroundColor Red; exit 1 }
+
+# ---------- Logging ----------
+$script:VerboseMode = [bool]$Verbose -or ($PSBoundParameters['Verbose'] -eq $true) -or ($VerbosePreference -ne 'SilentlyContinue')
+
+if (-not $LogFile) {
+    New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+    $stamp   = Get-Date -Format "yyyyMMdd-HHmmss"
+    $LogFile = Join-Path $LogDir "run-$stamp.log"
+}
+$script:LogFile = $LogFile
+
+function _Log {
+    param([string]$Level, [string]$Msg)
+    $line = "{0} [{1,-5}] {2}" -f (Get-Date -Format "HH:mm:ss.fff"), $Level, $Msg
+    try { Add-Content -LiteralPath $script:LogFile -Value $line -Encoding UTF8 } catch {}
+}
+function Info($m){ _Log "INFO" $m; Write-Host "[jpg2pdf] $m" -ForegroundColor Cyan }
+function Warn($m){ _Log "WARN" $m; Write-Host "[jpg2pdf] $m" -ForegroundColor Yellow }
+function Die ($m){ _Log "ERROR" $m; Write-Host "[jpg2pdf] $m" -ForegroundColor Red;
+                   Write-Host "[jpg2pdf] Full log: $script:LogFile" -ForegroundColor Red; exit 1 }
+function Verb($m){ _Log "VERB" $m; if ($script:VerboseMode) { Write-Host "[jpg2pdf]   $m" -ForegroundColor DarkGray } }
+
+# Run an external command, tee stdout+stderr to the log file.
+# In verbose mode, stream live to console; otherwise show only on failure.
+function Invoke-Logged {
+    param(
+        [Parameter(Mandatory=$true)][string]$Label,
+        [Parameter(Mandatory=$true)][string]$FilePath,
+        [string[]]$ArgumentList = @(),
+        [switch]$AllowFailure
+    )
+    $argDisplay = ($ArgumentList | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }) -join ' '
+    Verb "$Label -> $FilePath $argDisplay"
+    _Log "RUN" "$FilePath $argDisplay"
+
+    $tmpOut = [IO.Path]::GetTempFileName()
+    $tmpErr = [IO.Path]::GetTempFileName()
+    try {
+        $proc = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList `
+            -NoNewWindow -Wait -PassThru `
+            -RedirectStandardOutput $tmpOut -RedirectStandardError $tmpErr
+        $code = $proc.ExitCode
+
+        $out = if (Test-Path $tmpOut) { Get-Content -Raw -LiteralPath $tmpOut } else { "" }
+        $err = if (Test-Path $tmpErr) { Get-Content -Raw -LiteralPath $tmpErr } else { "" }
+
+        if ($out) { _Log "OUT " "[$Label]`n$out" }
+        if ($err) { _Log "ERR " "[$Label]`n$err" }
+
+        if ($script:VerboseMode) {
+            if ($out) { Write-Host $out }
+            if ($err) { Write-Host $err -ForegroundColor DarkYellow }
+        }
+
+        if ($code -ne 0) {
+            if (-not $script:VerboseMode) {
+                # On failure, dump captured output so the user sees it without re-running.
+                if ($out) { Write-Host "----- stdout -----" -ForegroundColor DarkGray; Write-Host $out }
+                if ($err) { Write-Host "----- stderr -----" -ForegroundColor DarkGray; Write-Host $err -ForegroundColor DarkYellow }
+            }
+            Warn "$Label failed with exit code $code (see $script:LogFile)"
+            if (-not $AllowFailure) { Die "$Label failed (exit $code)." }
+        } else {
+            Verb "$Label OK (exit 0)"
+        }
+        return $code
+    } finally {
+        Remove-Item -LiteralPath $tmpOut,$tmpErr -ErrorAction SilentlyContinue
+    }
+}
+
+Info "Log file: $script:LogFile"
+if ($script:VerboseMode) { Info "Verbose mode ON" }
+
+# Capture environment context up front — invaluable when debugging.
+_Log "ENV " ("PSVersion={0} OS={1} User={2} CWD={3}" -f `
+    $PSVersionTable.PSVersion, [Environment]::OSVersion.VersionString, $env:USERNAME, (Get-Location).Path)
 
 function Get-Python {
     foreach ($n in @("python","py")) {

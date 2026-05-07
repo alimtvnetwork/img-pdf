@@ -142,38 +142,50 @@ if (-not $py) {
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
         Die "winget unavailable. Install Python 3 from https://python.org and re-run."
     }
-    winget install -e --id Python.Python.3.12 --accept-source-agreements --accept-package-agreements
+    Invoke-Logged -Label "winget install Python" -FilePath "winget" -ArgumentList @(
+        "install","-e","--id","Python.Python.3.12",
+        "--accept-source-agreements","--accept-package-agreements"
+    )
     Refresh-Path
     $py = Get-Python
     if (-not $py) { Die "Python installed but not on PATH. Open a new terminal and re-run." }
 }
 Info "Python: $py"
+Invoke-Logged -Label "python --version" -FilePath $py -ArgumentList @("--version") -AllowFailure | Out-Null
 
 # ---------- 2. Git ----------
 $git = Get-Command git -ErrorAction SilentlyContinue
 if (-not $git -and (Get-Command winget -ErrorAction SilentlyContinue)) {
     Info "Git not found. Installing..."
-    winget install -e --id Git.Git --accept-source-agreements --accept-package-agreements
+    Invoke-Logged -Label "winget install Git" -FilePath "winget" -ArgumentList @(
+        "install","-e","--id","Git.Git",
+        "--accept-source-agreements","--accept-package-agreements"
+    )
     Refresh-Path
     $git = Get-Command git -ErrorAction SilentlyContinue
 }
+if ($git) { Verb "git: $($git.Source)" }
 
 # ---------- 3. Pull / clone repo ----------
 if ($localRepo) {
     Info "Using local repo at: $localRepo"
     if ($git -and (Test-Path (Join-Path $localRepo ".git"))) {
         Info "git pull..."
-        try { git -C $localRepo pull --ff-only } catch { Warn "git pull failed (continuing): $_" }
+        Invoke-Logged -Label "git pull" -FilePath $git.Source `
+            -ArgumentList @("-C", $localRepo, "pull", "--ff-only") -AllowFailure | Out-Null
     }
 } elseif ($git) {
     if (Test-Path (Join-Path $InstallDir ".git")) {
         Info "Updating repo in $InstallDir ..."
-        git -C $InstallDir fetch --depth=1 origin $Branch
-        git -C $InstallDir reset --hard "origin/$Branch"
+        Invoke-Logged -Label "git fetch" -FilePath $git.Source `
+            -ArgumentList @("-C",$InstallDir,"fetch","--depth=1","origin",$Branch)
+        Invoke-Logged -Label "git reset" -FilePath $git.Source `
+            -ArgumentList @("-C",$InstallDir,"reset","--hard","origin/$Branch")
     } else {
         Info "Cloning $RepoUrl -> $InstallDir ..."
         New-Item -ItemType Directory -Force -Path (Split-Path $InstallDir) | Out-Null
-        git clone --depth=1 --branch $Branch $RepoUrl $InstallDir
+        Invoke-Logged -Label "git clone" -FilePath $git.Source `
+            -ArgumentList @("clone","--depth=1","--branch",$Branch,$RepoUrl,$InstallDir)
     }
 } else {
     Die "Git unavailable and no local repo. Install Git or run from a cloned copy."
@@ -186,8 +198,10 @@ if (-not (Test-Path $srcScript)) { Die "Missing $srcScript" }
 
 # ---------- 4. Python deps ----------
 Info "Installing Python dependencies..."
-& $py -m pip install --user --upgrade --quiet -r $reqsFile
-if ($LASTEXITCODE -ne 0) { Die "pip install failed." }
+# Drop --quiet so log captures real pip output for troubleshooting.
+$pipArgs = @("-m","pip","install","--user","--upgrade","--disable-pip-version-check","-r",$reqsFile)
+if ($script:VerboseMode) { $pipArgs += "--verbose" }
+Invoke-Logged -Label "pip install -r requirements.txt" -FilePath $py -ArgumentList $pipArgs
 
 # ---------- 5. Compile (PyInstaller) or shim ----------
 $binDir = Join-Path $HOME "Tools\bin"
@@ -210,8 +224,9 @@ if ($NoCompile) {
         Info "jpg2pdf.exe already exists. Use -Force to rebuild."
     } else {
         Info "Installing PyInstaller..."
-        & $py -m pip install --user --upgrade --quiet pyinstaller
-        if ($LASTEXITCODE -ne 0) { Die "Failed to install PyInstaller." }
+        $piInstall = @("-m","pip","install","--user","--upgrade","--disable-pip-version-check","pyinstaller")
+        if ($script:VerboseMode) { $piInstall += "--verbose" }
+        Invoke-Logged -Label "pip install pyinstaller" -FilePath $py -ArgumentList $piInstall
 
         $buildDir = Join-Path $env:TEMP "jpg2pdf_build"
         $distDir  = Join-Path $env:TEMP "jpg2pdf_dist"
@@ -219,11 +234,17 @@ if ($NoCompile) {
         Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $buildDir,$distDir,$workDir
 
         Info "Compiling jpg2pdf.exe (PyInstaller, ~1 min)..."
-        & $py -m PyInstaller --onefile --name jpg2pdf --console `
-            --distpath $distDir --workpath $workDir --specpath $buildDir `
+        $piArgs = @(
+            "-m","PyInstaller","--onefile","--name","jpg2pdf","--console","--noconfirm",
+            "--distpath",$distDir,"--workpath",$workDir,"--specpath",$buildDir,
+            "--log-level", $(if ($script:VerboseMode) { "DEBUG" } else { "WARN" }),
             $srcScript
-        if ($LASTEXITCODE -ne 0) { Die "PyInstaller build failed." }
-        Copy-Item -Force (Join-Path $distDir "jpg2pdf.exe") $exePath
+        )
+        Invoke-Logged -Label "pyinstaller build" -FilePath $py -ArgumentList $piArgs
+
+        $built = Join-Path $distDir "jpg2pdf.exe"
+        if (-not (Test-Path $built)) { Die "PyInstaller finished but $built not found." }
+        Copy-Item -Force $built $exePath
         if (Test-Path $shimPath) { Remove-Item $shimPath -Force }
         Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $buildDir,$distDir,$workDir
         Info "Built: $exePath"

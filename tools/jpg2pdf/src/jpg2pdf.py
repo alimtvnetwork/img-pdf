@@ -14,11 +14,25 @@ import sys
 from pathlib import Path
 from PIL import Image, ImageChops, ImageEnhance, ImageFilter, ImageOps
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
+
+# Pencil presets — tuned for faint handwritten text.
+# Module-scope so prompt_pencil_strength() can render the live preview with
+# the same numbers main() will use for the real conversion.
+PENCIL_PRESETS = {
+    "subtle": dict(opacity=0.32, ink_threshold=105, ink_darken=0.52, brightness=1.0),
+    "normal": dict(opacity=0.20, ink_threshold=128, ink_darken=0.32, brightness=1.0),
+    "extra":  dict(opacity=0.10, ink_threshold=165, ink_darken=0.12, brightness=1.02),
+}
 
 
-def prompt_pencil_strength(default: str = "normal") -> str:
-    """Show a small Tk dropdown to pick pencil strength.
+def prompt_pencil_strength(default: str = "normal", sample_path=None) -> str:
+    """Show a Tk dropdown to pick pencil strength, with a LIVE preview.
+
+    When `sample_path` points to a real image, a thumbnail of that image is
+    rendered with each preset on the fly — switching the dropdown immediately
+    re-renders the preview so the user can pick the strength that makes
+    faint text most readable before any PDF is written.
 
     Returns the chosen value ('subtle' | 'normal' | 'extra'), or `default`
     if Tk is unavailable or the user cancels.
@@ -28,6 +42,14 @@ def prompt_pencil_strength(default: str = "normal") -> str:
         from tkinter import ttk
     except Exception:
         return default
+
+    # ImageTk is part of Pillow's tk extras — gracefully degrade without it.
+    try:
+        from PIL import ImageTk
+        has_imagetk = True
+    except Exception:
+        ImageTk = None
+        has_imagetk = False
 
     choices = ["subtle", "normal", "extra"]
     descriptions = {
@@ -59,20 +81,71 @@ def prompt_pencil_strength(default: str = "normal") -> str:
                          values=[descriptions[c] for c in choices], width=46)
     combo.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 12))
 
-    def _ok(_evt=None):
+    # ---- Live preview ----
+    preview_thumb = None     # base RGB thumbnail (PIL Image), small for speed
+    preview_label = None
+    photo_ref = {"img": None}   # keep PhotoImage reference alive
+
+    if sample_path is not None and has_imagetk:
+        try:
+            with Image.open(sample_path) as raw:
+                base = raw.convert("RGB")
+                base.thumbnail((520, 520), Image.LANCZOS)
+                preview_thumb = base.copy()
+        except Exception:
+            preview_thumb = None
+
+    if preview_thumb is not None:
+        ttk.Label(frm, text="Live preview (faint text gets clearer →):").grid(
+            row=2, column=0, columnspan=2, sticky="w", pady=(4, 4))
+        preview_label = ttk.Label(frm, relief="solid", borderwidth=1)
+        preview_label.grid(row=3, column=0, columnspan=2, pady=(0, 12))
+    elif sample_path is not None:
+        ttk.Label(frm,
+                  text="(Install Pillow's Tk extras for a live preview)",
+                  foreground="#888").grid(row=2, column=0, columnspan=2,
+                                          sticky="w", pady=(0, 8))
+
+    def _selected_key():
         sel = var.get()
         for c in choices:
             if descriptions[c] == sel:
-                result["value"] = c
-                break
+                return c
+        return default
+
+    def _render_preview(*_):
+        if preview_thumb is None or preview_label is None:
+            return
+        key = _selected_key()
+        p = PENCIL_PRESETS[key]
+        try:
+            rendered = apply_pencil(
+                preview_thumb,
+                opacity=p["opacity"],
+                brightness=p["brightness"],
+                ink_threshold=p["ink_threshold"],
+                ink_darken=p["ink_darken"],
+            )
+        except Exception:
+            return
+        photo_ref["img"] = ImageTk.PhotoImage(rendered)
+        preview_label.configure(image=photo_ref["img"])
+
+    combo.bind("<<ComboboxSelected>>", _render_preview)
+    _render_preview()  # initial render for `default`
+
+    def _ok(_evt=None):
+        result["value"] = _selected_key()
         root.destroy()
 
     def _cancel(_evt=None):
         root.destroy()
 
-    ttk.Button(frm, text="Cancel", command=_cancel).grid(row=2, column=0, sticky="e", padx=(0, 6))
-    ok_btn = ttk.Button(frm, text="Convert", command=_ok)
-    ok_btn.grid(row=2, column=1, sticky="w")
+    btns = ttk.Frame(frm)
+    btns.grid(row=4, column=0, columnspan=2, sticky="e")
+    ttk.Button(btns, text="Cancel", command=_cancel).grid(row=0, column=0, padx=(0, 6))
+    ok_btn = ttk.Button(btns, text="Convert", command=_ok)
+    ok_btn.grid(row=0, column=1)
     root.bind("<Return>", _ok)
     root.bind("<Escape>", _cancel)
     ok_btn.focus_set()
@@ -81,7 +154,7 @@ def prompt_pencil_strength(default: str = "normal") -> str:
     root.update_idletasks()
     w = root.winfo_width(); h = root.winfo_height()
     sw = root.winfo_screenwidth(); sh = root.winfo_screenheight()
-    root.geometry(f"+{(sw - w) // 2}+{(sh - h) // 3}")
+    root.geometry(f"+{(sw - w) // 2}+{max(20, (sh - h) // 4)}")
 
     root.mainloop()
     return result["value"]
@@ -358,30 +431,8 @@ def main():
                          "subtle/normal/extra before converting.")
     args = ap.parse_args()
 
-    # Interactive picker (only meaningful with --style pencil)
-    if args.ask_strength and args.style == "pencil":
-        # Only honor the picker if user didn't already override on the CLI
-        cli_overrode = any(v is not None for v in (
-            args.pencil_opacity, args.pencil_ink_threshold,
-            args.pencil_ink_darken, args.pencil_brightness))
-        if not cli_overrode:
-            args.pencil_strength = prompt_pencil_strength(args.pencil_strength)
-
-    # Pencil presets — tuned for faint handwritten text.
-    # Override individually with --pencil-opacity / --pencil-ink-threshold /
-    # --pencil-ink-darken / --pencil-brightness.
-    PENCIL_PRESETS = {
-        "subtle": dict(opacity=0.32, ink_threshold=105, ink_darken=0.52, brightness=1.0),
-        "normal": dict(opacity=0.20, ink_threshold=128, ink_darken=0.32, brightness=1.0),
-        "extra":  dict(opacity=0.10, ink_threshold=165, ink_darken=0.12, brightness=1.02),
-    }
-    preset = PENCIL_PRESETS[args.pencil_strength]
-    if args.pencil_opacity       is None: args.pencil_opacity       = preset["opacity"]
-    if args.pencil_ink_threshold is None: args.pencil_ink_threshold = preset["ink_threshold"]
-    if args.pencil_ink_darken    is None: args.pencil_ink_darken    = preset["ink_darken"]
-    if args.pencil_brightness    is None: args.pencil_brightness    = preset["brightness"]
-
-    # ---- Resolve input mode ----
+    # ---- Resolve input mode (BEFORE the strength picker so we can pass a
+    # real sample image into the live preview) ----
     images = []
     default_out = None
 
@@ -409,6 +460,23 @@ def main():
 
     if not images:
         print("No images to convert.", file=sys.stderr); sys.exit(1)
+
+    # Interactive picker with LIVE preview (only meaningful with --style pencil)
+    if args.ask_strength and args.style == "pencil":
+        cli_overrode = any(v is not None for v in (
+            args.pencil_opacity, args.pencil_ink_threshold,
+            args.pencil_ink_darken, args.pencil_brightness))
+        if not cli_overrode:
+            args.pencil_strength = prompt_pencil_strength(
+                args.pencil_strength, sample_path=images[0])
+
+    # Apply preset (defined at module scope) for any --pencil-* flag the user
+    # didn't override on the CLI.
+    preset = PENCIL_PRESETS[args.pencil_strength]
+    if args.pencil_opacity       is None: args.pencil_opacity       = preset["opacity"]
+    if args.pencil_ink_threshold is None: args.pencil_ink_threshold = preset["ink_threshold"]
+    if args.pencil_ink_darken    is None: args.pencil_ink_darken    = preset["ink_darken"]
+    if args.pencil_brightness    is None: args.pencil_brightness    = preset["brightness"]
 
     w, h = PAGE_SIZES[args.size]
     if args.orientation == "landscape":

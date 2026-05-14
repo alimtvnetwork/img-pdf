@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
-__version__ = "0.6.1"
+__version__ = "0.7.0"
 
 PAGE_SIZES = {  # points (1/72 inch)
     "a4":     (595.28, 841.89),
@@ -238,17 +238,38 @@ def main():
     ap.add_argument("--style", choices=["none", "pencil"], default="none",
                     help="Rendering style. 'pencil' = pencil-on-paper look "
                          "(text/dark strokes stay black, paper & mid-tones fade out)")
-    ap.add_argument("--pencil-opacity", type=float, default=0.25,
+    ap.add_argument("--pencil-strength",
+                    choices=["subtle", "normal", "extra"], default="normal",
+                    help="Pencil preset for faint text: "
+                         "'subtle' (gentle, keeps paper texture), "
+                         "'normal' (default, balanced), "
+                         "'extra' (extra-visible — aggressive darkening for very faint pencil). "
+                         "Individual --pencil-* flags override the preset.")
+    ap.add_argument("--pencil-opacity", type=float, default=None,
                     help="Pencil style: how much non-ink survives (0..1, default 0.25). "
                          "Lower = whiter paper.")
-    ap.add_argument("--pencil-ink-threshold", type=int, default=110,
+    ap.add_argument("--pencil-ink-threshold", type=int, default=None,
                     help="Pencil style: pixel value (0..255) below which a pixel is "
-                         "treated as ink and kept dark (default 90).")
-    ap.add_argument("--pencil-ink-darken", type=float, default=0.45,
-                    help="Pencil style: ink multiplier (<1 makes ink blacker, default 0.65).")
-    ap.add_argument("--pencil-brightness", type=float, default=1.0,
+                         "treated as ink and kept dark.")
+    ap.add_argument("--pencil-ink-darken", type=float, default=None,
+                    help="Pencil style: ink multiplier (<1 makes ink blacker).")
+    ap.add_argument("--pencil-brightness", type=float, default=None,
                     help="Pencil style: post-process brightness multiplier (default 1.0).")
     args = ap.parse_args()
+
+    # Pencil presets — tuned for faint handwritten text.
+    # Override individually with --pencil-opacity / --pencil-ink-threshold /
+    # --pencil-ink-darken / --pencil-brightness.
+    PENCIL_PRESETS = {
+        "subtle": dict(opacity=0.35, ink_threshold=95,  ink_darken=0.60, brightness=1.0),
+        "normal": dict(opacity=0.25, ink_threshold=110, ink_darken=0.45, brightness=1.0),
+        "extra":  dict(opacity=0.15, ink_threshold=140, ink_darken=0.20, brightness=1.05),
+    }
+    preset = PENCIL_PRESETS[args.pencil_strength]
+    if args.pencil_opacity       is None: args.pencil_opacity       = preset["opacity"]
+    if args.pencil_ink_threshold is None: args.pencil_ink_threshold = preset["ink_threshold"]
+    if args.pencil_ink_darken    is None: args.pencil_ink_darken    = preset["ink_darken"]
+    if args.pencil_brightness    is None: args.pencil_brightness    = preset["brightness"]
 
     # ---- Resolve input mode ----
     images = []
@@ -291,7 +312,7 @@ def main():
     print(f"Page:     {args.size} {args.orientation} ({int(w)}x{int(h)} pt) @ {args.dpi} DPI")
     print(f"Fit:      {args.fit}  rotate: {args.rotate}  auto-rotate: {auto_rot}")
     if args.style == "pencil":
-        print(f"Style:    pencil (opacity={args.pencil_opacity}, "
+        print(f"Style:    pencil [{args.pencil_strength}] (opacity={args.pencil_opacity}, "
               f"ink<= {args.pencil_ink_threshold} *{args.pencil_ink_darken}, "
               f"brightness={args.pencil_brightness})")
     print(f"Output:   {out}")

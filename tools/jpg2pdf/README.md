@@ -55,13 +55,24 @@ Prebuilt assets published by `.github/workflows/release.yml`:
 ## Use
 
 ```bash
+# Image folders
 jpg2pdf ~/Pictures --size a4
 jpg2pdf . --size letter --fit cover --out album.pdf
 jpg2pdf . --size legal --orientation landscape --recursive
 jpg2pdf . --size a4 --style pencil           # faint pencil-on-paper look
+
+# Mixed selections — merged in the order given
+jpg2pdf --files cover.jpg invoice.pdf notes.docx report.html --out bundle.pdf
 ```
 
-Supported inputs: `.jpg .jpeg .png .webp .bmp .tif .tiff` (sorted naturally).
+Supported inputs (sorted naturally; mixed types merged in selection order):
+
+| Kind  | Extensions                              | Notes |
+|-------|------------------------------------------|-------|
+| Image | `.jpg .jpeg .png .webp .bmp .tif .tiff` | Honors `--size/--fit/--style/...` |
+| PDF   | `.pdf`                                   | Embedded as-is |
+| HTML  | `.html .htm`                             | Rendered via `xhtml2pdf` |
+| Word  | `.docx .doc`                             | Needs MS Word (Windows) or LibreOffice (macOS) |
 
 ## Build from source
 

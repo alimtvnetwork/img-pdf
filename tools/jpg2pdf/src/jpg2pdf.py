@@ -49,32 +49,63 @@ def collect_from_list(paths):
     return out
 
 
-def apply_pencil(im: Image.Image, opacity: float, brightness: float) -> Image.Image:
-    """Make the image look like a faint pencil sketch on paper.
+def apply_pencil(im: Image.Image, opacity: float, brightness: float,
+                 ink_threshold: int = 90, ink_darken: float = 0.65) -> Image.Image:
+    """Make the image look like pencil writing on paper.
 
-    - Reduce opacity: blend the image toward a white background
-      (final = white*(1-opacity) + image*opacity).
-    - Increase brightness: lighten the remaining ink.
+    Approach: a smooth S-curve (contrast remap) so dark strokes stay solid
+    black while paper / mid-tones / shading roll off to white. This keeps
+    anti-aliased text edges intact (a hard threshold would chop them off and
+    make small text look pixelated).
+
+      contrast = 1 + (1 - opacity) * 4
+      out = clamp( ((v/255 - 0.5) * contrast + 0.5) * 255 )
+
+    opacity:    overall darkness of non-ink (0..1). Lower = whiter paper.
+                Default 0.25 → contrast=4 → ink stays black, paper goes white.
+    brightness: post multiplier (default 1.0 = none).
+    ink_threshold / ink_darken: legacy knobs, kept for CLI compat. When
+        ink_threshold > 0 we additionally darken pixels at or below it by
+        `ink_darken` so very dark ink can be made even blacker on demand.
     """
     opacity    = max(0.0, min(1.0, opacity))
     brightness = max(0.1, brightness)
-    white = Image.new("RGB", im.size, "white")
-    faded = Image.blend(white, im, opacity)
-    return ImageEnhance.Brightness(faded).enhance(brightness)
+    ink_darken = max(0.1, min(1.0, ink_darken))
+
+    contrast = 1.0 + (1.0 - opacity) * 4.0
+
+    lut = []
+    for v in range(256):
+        # S-curve / contrast around mid-gray.
+        t = ((v / 255.0) - 0.5) * contrast + 0.5
+        out = int(round(max(0.0, min(1.0, t)) * 255))
+        # Optional extra darken for very dark ink.
+        if v <= ink_threshold:
+            out = min(out, int(round(v * ink_darken)))
+        lut.append(out)
+
+    im = im.convert("RGB")
+    im = im.point(lut * 3)  # apply to R, G, B channels
+    if brightness != 1.0:
+        im = ImageEnhance.Brightness(im).enhance(brightness)
+    return im
 
 
 def make_page(img_path: Path, page_w_pt: float, page_h_pt: float,
               fit: str, dpi: int, auto_rotate: str, rotate: int,
               style: str = "none",
-              pencil_opacity: float = 0.4,
-              pencil_brightness: float = 1.25) -> Image.Image:
+              pencil_opacity: float = 0.25,
+              pencil_brightness: float = 1.0,
+              pencil_ink_threshold: int = 90,
+              pencil_ink_darken: float = 0.65) -> Image.Image:
     """Render one PDF page at `dpi` DPI.
 
     rotate:      extra rotation applied to every image (0/90/180/270, CCW).
     auto_rotate: 'cw'  -> rotate landscape images 90° clockwise to fit portrait page
                  'ccw' -> rotate 90° counter-clockwise
                  'off' -> never auto-rotate
-    style:       'none' (default) or 'pencil' (faint pencil-on-paper look).
+    style:       'none' (default) or 'pencil' (text/dark strokes stay black,
+                 paper & mid-tones fade out).
     """
     with Image.open(img_path) as im:
         im = im.convert("RGB")
@@ -93,7 +124,9 @@ def make_page(img_path: Path, page_w_pt: float, page_h_pt: float,
                 iw, ih = im.size
 
         if style == "pencil":
-            im = apply_pencil(im, pencil_opacity, pencil_brightness)
+            im = apply_pencil(im, pencil_opacity, pencil_brightness,
+                              ink_threshold=pencil_ink_threshold,
+                              ink_darken=pencil_ink_darken)
 
         scale = dpi / 72.0
         canvas_w = max(1, int(round(page_w_pt * scale)))
@@ -150,12 +183,18 @@ def main():
     ap.add_argument("--no-auto-rotate", action="store_true",
                     help="Shortcut for --auto-rotate off")
     ap.add_argument("--style", choices=["none", "pencil"], default="none",
-                    help="Rendering style. 'pencil' = faint pencil-on-paper look "
-                         "(reduced opacity + boosted brightness)")
-    ap.add_argument("--pencil-opacity", type=float, default=0.4,
-                    help="Pencil style: image opacity over white (0..1, default 0.4)")
-    ap.add_argument("--pencil-brightness", type=float, default=1.25,
-                    help="Pencil style: brightness multiplier (default 1.25)")
+                    help="Rendering style. 'pencil' = pencil-on-paper look "
+                         "(text/dark strokes stay black, paper & mid-tones fade out)")
+    ap.add_argument("--pencil-opacity", type=float, default=0.25,
+                    help="Pencil style: how much non-ink survives (0..1, default 0.25). "
+                         "Lower = whiter paper.")
+    ap.add_argument("--pencil-ink-threshold", type=int, default=90,
+                    help="Pencil style: pixel value (0..255) below which a pixel is "
+                         "treated as ink and kept dark (default 90).")
+    ap.add_argument("--pencil-ink-darken", type=float, default=0.65,
+                    help="Pencil style: ink multiplier (<1 makes ink blacker, default 0.65).")
+    ap.add_argument("--pencil-brightness", type=float, default=1.0,
+                    help="Pencil style: post-process brightness multiplier (default 1.0).")
     args = ap.parse_args()
 
     # ---- Resolve input mode ----
@@ -199,7 +238,9 @@ def main():
     print(f"Page:     {args.size} {args.orientation} ({int(w)}x{int(h)} pt) @ {args.dpi} DPI")
     print(f"Fit:      {args.fit}  rotate: {args.rotate}  auto-rotate: {auto_rot}")
     if args.style == "pencil":
-        print(f"Style:    pencil (opacity={args.pencil_opacity}, brightness={args.pencil_brightness})")
+        print(f"Style:    pencil (opacity={args.pencil_opacity}, "
+              f"ink<= {args.pencil_ink_threshold} *{args.pencil_ink_darken}, "
+              f"brightness={args.pencil_brightness})")
     print(f"Output:   {out}")
 
     pages = []
@@ -209,7 +250,9 @@ def main():
                                auto_rotate=auto_rot, rotate=args.rotate,
                                style=args.style,
                                pencil_opacity=args.pencil_opacity,
-                               pencil_brightness=args.pencil_brightness))
+                               pencil_brightness=args.pencil_brightness,
+                               pencil_ink_threshold=args.pencil_ink_threshold,
+                               pencil_ink_darken=args.pencil_ink_darken))
 
     pages[0].save(out, "PDF", resolution=float(args.dpi),
                   save_all=True, append_images=pages[1:])

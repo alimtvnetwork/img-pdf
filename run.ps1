@@ -57,11 +57,39 @@ function _Log {
     $line = "{0} [{1,-5}] {2}" -f (Get-Date -Format "HH:mm:ss.fff"), $Level, $Msg
     try { Add-Content -LiteralPath $script:LogFile -Value $line -Encoding UTF8 } catch {}
 }
-function Info($m){ _Log "INFO" $m; Write-Host "[jpg2pdf] $m" -ForegroundColor Cyan }
-function Warn($m){ _Log "WARN" $m; Write-Host "[jpg2pdf] $m" -ForegroundColor Yellow }
-function Die ($m){ _Log "ERROR" $m; Write-Host "[jpg2pdf] $m" -ForegroundColor Red;
-                   Write-Host "[jpg2pdf] Full log: $script:LogFile" -ForegroundColor Red; exit 1 }
-function Verb($m){ _Log "VERB" $m; if ($script:VerboseMode) { Write-Host "[jpg2pdf]   $m" -ForegroundColor DarkGray } }
+function _Tag([string]$t,[ConsoleColor]$c){ Write-Host -NoNewline "[" -ForegroundColor DarkGray; Write-Host -NoNewline $t -ForegroundColor $c; Write-Host -NoNewline "] " -ForegroundColor DarkGray }
+function Info($m){ _Log "INFO" $m; _Tag " ok " Green;   Write-Host $m -ForegroundColor Gray }
+function Warn($m){ _Log "WARN" $m; _Tag "warn" Yellow;  Write-Host $m -ForegroundColor Yellow }
+function Die ($m){ _Log "ERROR" $m; _Tag "fail" Red;    Write-Host $m -ForegroundColor Red
+                   _Tag "fail" Red; Write-Host "Full log: $script:LogFile" -ForegroundColor DarkGray; exit 1 }
+function Verb($m){ _Log "VERB" $m; if ($script:VerboseMode) { _Tag "dbg " DarkGray; Write-Host $m -ForegroundColor DarkGray } }
+
+function Show-Banner {
+    param([string]$Version)
+    $line = ('-' * 60)
+    Write-Host ""
+    Write-Host "  $line" -ForegroundColor DarkGray
+    Write-Host "   jpg2pdf installer" -NoNewline -ForegroundColor Magenta
+    Write-Host "   v$Version" -ForegroundColor DarkGray
+    Write-Host "   images -> PDF, with Explorer right-click integration" -ForegroundColor DarkGray
+    Write-Host "  $line" -ForegroundColor DarkGray
+    Write-Host ""
+}
+function Show-Section {
+    param([int]$N,[int]$Total,[string]$Title)
+    Write-Host ""
+    Write-Host ("  [{0}/{1}] " -f $N,$Total) -NoNewline -ForegroundColor DarkCyan
+    Write-Host $Title -ForegroundColor Cyan
+    Write-Host ("  " + ('-' * (8 + $Title.Length))) -ForegroundColor DarkGray
+}
+function Show-Footer {
+    Write-Host ""
+    Write-Host ("  " + ('-' * 60)) -ForegroundColor DarkGray
+    Write-Host "   Installation complete." -ForegroundColor Green
+    Write-Host "   Open a NEW terminal so PATH changes take effect." -ForegroundColor DarkGray
+    Write-Host ("  " + ('-' * 60)) -ForegroundColor DarkGray
+    Write-Host ""
+}
 
 # Run an external command, tee stdout+stderr to the log file.
 # In verbose mode, stream live to console; otherwise show only on failure.

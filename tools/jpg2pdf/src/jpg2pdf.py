@@ -198,13 +198,18 @@ def main():
     print(f"Files:    {len(images)}")
     print(f"Page:     {args.size} {args.orientation} ({int(w)}x{int(h)} pt) @ {args.dpi} DPI")
     print(f"Fit:      {args.fit}  rotate: {args.rotate}  auto-rotate: {auto_rot}")
+    if args.style == "pencil":
+        print(f"Style:    pencil (opacity={args.pencil_opacity}, brightness={args.pencil_brightness})")
     print(f"Output:   {out}")
 
     pages = []
     for i, p in enumerate(images, 1):
         print(f"  [{i}/{len(images)}] {p.name}")
         pages.append(make_page(p, w, h, args.fit, args.dpi,
-                               auto_rotate=auto_rot, rotate=args.rotate))
+                               auto_rotate=auto_rot, rotate=args.rotate,
+                               style=args.style,
+                               pencil_opacity=args.pencil_opacity,
+                               pencil_brightness=args.pencil_brightness))
 
     pages[0].save(out, "PDF", resolution=float(args.dpi),
                   save_all=True, append_images=pages[1:])

@@ -3,13 +3,13 @@
   One-liner installer for jpg2pdf on Windows (no clone, no Python required).
 
 .USAGE
-  irm https://raw.githubusercontent.com/OWNER/REPO/main/install.ps1 | iex
+  irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 
   # Pin a specific version:
-  $env:JPG2PDF_VERSION = "v0.5.0"; irm https://raw.githubusercontent.com/OWNER/REPO/main/install.ps1 | iex
+  $env:JPG2PDF_VERSION = "v0.5.0"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 
   # Skip Explorer context-menu registration:
-  $env:JPG2PDF_NO_CONTEXT_MENU = "1"; irm https://raw.githubusercontent.com/OWNER/REPO/main/install.ps1 | iex
+  $env:JPG2PDF_NO_CONTEXT_MENU = "1"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 
 .WHAT IT DOES
   1. Resolves the latest GitHub Release (or $env:JPG2PDF_VERSION).
@@ -19,7 +19,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Repo    = $(if ($env:JPG2PDF_REPO)    { $env:JPG2PDF_REPO }    else { "OWNER/REPO" }),
+    [string]$Repo    = $(if ($env:JPG2PDF_REPO)    { $env:JPG2PDF_REPO }    else { "alimtvnetwork/img-pdf" }),
     [string]$Version = $(if ($env:JPG2PDF_VERSION) { $env:JPG2PDF_VERSION } else { "" }),
     [switch]$NoContextMenu
 )
@@ -30,7 +30,7 @@ function Warn($m) { Write-Host "[jpg2pdf] $m" -ForegroundColor Yellow }
 function Die ($m) { Write-Host "[jpg2pdf] $m" -ForegroundColor Red; exit 1 }
 
 if ($env:JPG2PDF_NO_CONTEXT_MENU -eq "1") { $NoContextMenu = $true }
-if ($Repo -eq "OWNER/REPO") {
+if ($Repo -eq "alimtvnetwork/img-pdf") {
     Die "Set the repo: `$env:JPG2PDF_REPO = 'your-user/your-repo'  (or edit install.ps1)."
 }
 

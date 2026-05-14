@@ -24,7 +24,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$RepoUrl     = "https://github.com/CHANGE_ME/jpg2pdf.git",
+    [string]$RepoUrl     = "https://github.com/alimtvnetwork/img-pdf.git",
     [string]$InstallDir  = (Join-Path $HOME "Tools\jpg2pdf"),
     [string]$Branch      = "main",
     [switch]$NoCompile,

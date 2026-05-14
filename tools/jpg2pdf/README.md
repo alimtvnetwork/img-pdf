@@ -7,19 +7,19 @@ See [`spec/SPEC.md`](spec/SPEC.md) for the full specification.
 
 ## Install — one-liner (prebuilt binaries from GitHub Releases)
 
-Replace `OWNER/REPO` with this repo's GitHub path.
+Replace `alimtvnetwork/img-pdf` with this repo's GitHub path.
 
 ### Windows (PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/OWNER/REPO/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 ```
 
 Pin a version, or skip the Explorer context-menu:
 
 ```powershell
-$env:JPG2PDF_VERSION = "v0.5.0"; irm https://raw.githubusercontent.com/OWNER/REPO/main/install.ps1 | iex
-$env:JPG2PDF_NO_CONTEXT_MENU = "1"; irm https://raw.githubusercontent.com/OWNER/REPO/main/install.ps1 | iex
+$env:JPG2PDF_VERSION = "v0.5.0"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
+$env:JPG2PDF_NO_CONTEXT_MENU = "1"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 ```
 
 Drops `jpg2pdf.exe` into `%USERPROFILE%\Tools\bin`, adds it to **User PATH**,
@@ -28,13 +28,13 @@ and registers Explorer right-click entries. Open a new terminal afterwards.
 ### macOS / Linux (curl)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | sh
 ```
 
 Options via env vars:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh \
   | JPG2PDF_VERSION=v0.5.0 JPG2PDF_PREFIX=$HOME/bin sh
 ```
 

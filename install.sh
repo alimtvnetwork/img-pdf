@@ -2,10 +2,10 @@
 # One-liner installer for jpg2pdf on Linux & macOS.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | sh
 #
 #   # Pin a specific version:
-#   curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | JPG2PDF_VERSION=v0.5.0 sh
+#   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | JPG2PDF_VERSION=v0.5.0 sh
 #
 #   # Install elsewhere (default: $HOME/.local/bin):
 #   curl -fsSL https://.../install.sh | JPG2PDF_PREFIX=$HOME/bin sh
@@ -18,7 +18,7 @@
 
 set -eu
 
-REPO="${JPG2PDF_REPO:-OWNER/REPO}"
+REPO="${JPG2PDF_REPO:-alimtvnetwork/img-pdf}"
 VERSION="${JPG2PDF_VERSION:-}"
 PREFIX="${JPG2PDF_PREFIX:-$HOME/.local/bin}"
 
@@ -26,7 +26,7 @@ info() { printf '\033[36m[jpg2pdf]\033[0m %s\n' "$*"; }
 warn() { printf '\033[33m[jpg2pdf]\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[31m[jpg2pdf]\033[0m %s\n' "$*" >&2; exit 1; }
 
-if [ "$REPO" = "OWNER/REPO" ]; then
+if [ "$REPO" = "alimtvnetwork/img-pdf" ]; then
   die "Set the repo: JPG2PDF_REPO=your-user/your-repo curl ... | sh  (or edit install.sh)."
 fi
 

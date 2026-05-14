@@ -431,30 +431,8 @@ def main():
                          "subtle/normal/extra before converting.")
     args = ap.parse_args()
 
-    # Interactive picker (only meaningful with --style pencil)
-    if args.ask_strength and args.style == "pencil":
-        # Only honor the picker if user didn't already override on the CLI
-        cli_overrode = any(v is not None for v in (
-            args.pencil_opacity, args.pencil_ink_threshold,
-            args.pencil_ink_darken, args.pencil_brightness))
-        if not cli_overrode:
-            args.pencil_strength = prompt_pencil_strength(args.pencil_strength)
-
-    # Pencil presets — tuned for faint handwritten text.
-    # Override individually with --pencil-opacity / --pencil-ink-threshold /
-    # --pencil-ink-darken / --pencil-brightness.
-    PENCIL_PRESETS = {
-        "subtle": dict(opacity=0.32, ink_threshold=105, ink_darken=0.52, brightness=1.0),
-        "normal": dict(opacity=0.20, ink_threshold=128, ink_darken=0.32, brightness=1.0),
-        "extra":  dict(opacity=0.10, ink_threshold=165, ink_darken=0.12, brightness=1.02),
-    }
-    preset = PENCIL_PRESETS[args.pencil_strength]
-    if args.pencil_opacity       is None: args.pencil_opacity       = preset["opacity"]
-    if args.pencil_ink_threshold is None: args.pencil_ink_threshold = preset["ink_threshold"]
-    if args.pencil_ink_darken    is None: args.pencil_ink_darken    = preset["ink_darken"]
-    if args.pencil_brightness    is None: args.pencil_brightness    = preset["brightness"]
-
-    # ---- Resolve input mode ----
+    # ---- Resolve input mode (BEFORE the strength picker so we can pass a
+    # real sample image into the live preview) ----
     images = []
     default_out = None
 
@@ -482,6 +460,23 @@ def main():
 
     if not images:
         print("No images to convert.", file=sys.stderr); sys.exit(1)
+
+    # Interactive picker with LIVE preview (only meaningful with --style pencil)
+    if args.ask_strength and args.style == "pencil":
+        cli_overrode = any(v is not None for v in (
+            args.pencil_opacity, args.pencil_ink_threshold,
+            args.pencil_ink_darken, args.pencil_brightness))
+        if not cli_overrode:
+            args.pencil_strength = prompt_pencil_strength(
+                args.pencil_strength, sample_path=images[0])
+
+    # Apply preset (defined at module scope) for any --pencil-* flag the user
+    # didn't override on the CLI.
+    preset = PENCIL_PRESETS[args.pencil_strength]
+    if args.pencil_opacity       is None: args.pencil_opacity       = preset["opacity"]
+    if args.pencil_ink_threshold is None: args.pencil_ink_threshold = preset["ink_threshold"]
+    if args.pencil_ink_darken    is None: args.pencil_ink_darken    = preset["ink_darken"]
+    if args.pencil_brightness    is None: args.pencil_brightness    = preset["brightness"]
 
     w, h = PAGE_SIZES[args.size]
     if args.orientation == "landscape":

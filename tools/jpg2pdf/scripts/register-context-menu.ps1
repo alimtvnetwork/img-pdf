@@ -58,9 +58,12 @@ foreach ($raw in $FilePath) {
 $paths = $paths | Select-Object -Unique
 if (-not $paths -or -not (Test-Path -LiteralPath $ExePath)) { exit 1 }
 
-$firstDir = Split-Path -Parent $paths[0]
 $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-$keySource = "$sid|$firstDir|$Size|$Style|$Rotate|$([bool]$NoAutoRotate)"
+# Group by the selected action, not by the first file path. Explorer can invoke
+# legacy file verbs once per selected file, and mixed-folder selections otherwise
+# split into several batches. The queue below coalesces those invocations into
+# one visible terminal and one jpg2pdf run.
+$keySource = "$sid|selected|$Size|$Style|$Rotate|$([bool]$NoAutoRotate)"
 $key = Get-SafeHash $keySource
 $queueRoot = Join-Path $env:TEMP "jpg2pdf-selected-queue"
 New-Item -ItemType Directory -Force -Path $queueRoot | Out-Null
@@ -90,12 +93,13 @@ try {
 
 if (-not $leader) { exit 0 }
 
-$deadline = (Get-Date).AddSeconds(6)
+$deadline = (Get-Date).AddSeconds(15)
+$quietFor = [TimeSpan]::FromMilliseconds(1800)
 do {
-    $before = if (Test-Path -LiteralPath $queueFile) { (Get-Item -LiteralPath $queueFile).LastWriteTimeUtc } else { Get-Date }
-    Start-Sleep -Milliseconds 900
-    $after = if (Test-Path -LiteralPath $queueFile) { (Get-Item -LiteralPath $queueFile).LastWriteTimeUtc } else { Get-Date }
-} while ($after -ne $before -and (Get-Date) -lt $deadline)
+    Start-Sleep -Milliseconds 300
+    $lastWrite = if (Test-Path -LiteralPath $queueFile) { (Get-Item -LiteralPath $queueFile).LastWriteTimeUtc } else { [DateTime]::UtcNow }
+    $quiet = ([DateTime]::UtcNow - $lastWrite) -ge $quietFor
+} while (-not $quiet -and (Get-Date) -lt $deadline)
 
 $mutex = New-Object System.Threading.Mutex($false, $mutexName)
 try {
@@ -111,6 +115,8 @@ try {
 }
 
 if (-not $all -or $all.Count -eq 0) { exit 0 }
+
+$firstDir = Split-Path -Parent $all[0]
 
 $listFile = Join-Path $queueRoot ("files-" + $key + "-" + [Guid]::NewGuid().ToString("N") + ".txt")
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)

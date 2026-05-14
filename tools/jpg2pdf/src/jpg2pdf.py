@@ -50,7 +50,7 @@ def collect_from_list(paths):
 
 
 def apply_pencil(im: Image.Image, opacity: float, brightness: float,
-                 ink_threshold: int = 90, ink_darken: float = 0.65) -> Image.Image:
+                 ink_threshold: int = 110, ink_darken: float = 0.45) -> Image.Image:
     """Render the image as crisp pencil writing on clean paper.
 
     Pipeline:

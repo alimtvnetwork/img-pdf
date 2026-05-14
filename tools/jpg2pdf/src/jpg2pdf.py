@@ -650,6 +650,14 @@ def main():
                          "subtle/normal/extra before converting.")
     ap.add_argument("--reset-prefs", action="store_true",
                     help="Forget the saved pencil-strength preference and exit.")
+    ap.add_argument("--preview-grid", action="store_true",
+                    help="Before converting, open a scrollable thumbnail grid "
+                         "so you can confirm / deselect images. Cancel aborts "
+                         "the run; uncheck any image to skip it.")
+    ap.add_argument("--thumb-size", type=int, default=140,
+                    help="--preview-grid: max thumbnail edge in pixels (default 140).")
+    ap.add_argument("--thumb-cols", type=int, default=4,
+                    help="--preview-grid: number of columns (default 4).")
     args = ap.parse_args()
 
     # Load persisted prefs (last chosen pencil strength).

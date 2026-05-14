@@ -9,12 +9,14 @@ Two input modes:
 See spec/SPEC.md for the full specification.
 """
 import argparse
+import json
+import os
 import re
 import sys
 from pathlib import Path
 from PIL import Image, ImageChops, ImageEnhance, ImageFilter, ImageOps
 
-__version__ = "0.9.0"
+__version__ = "0.9.1"
 
 # Pencil presets — tuned for faint handwritten text.
 # Module-scope so prompt_pencil_strength() can render the live preview with
@@ -24,6 +26,28 @@ PENCIL_PRESETS = {
     "normal": dict(opacity=0.20, ink_threshold=128, ink_darken=0.32, brightness=1.0),
     "extra":  dict(opacity=0.10, ink_threshold=165, ink_darken=0.12, brightness=1.02),
 }
+
+# ---- Persistent user prefs (last chosen pencil strength, etc.) ----
+# Honors $JPG2PDF_CONFIG_DIR for tests / portable installs.
+CONFIG_DIR  = Path(os.environ.get("JPG2PDF_CONFIG_DIR",
+                                  str(Path.home() / ".jpg2pdf")))
+CONFIG_PATH = CONFIG_DIR / "config.json"
+
+
+def load_prefs() -> dict:
+    try:
+        return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def save_prefs(prefs: dict) -> None:
+    try:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        CONFIG_PATH.write_text(json.dumps(prefs, indent=2), encoding="utf-8")
+    except Exception as e:
+        print(f"  (warning: could not save prefs: {e})", file=sys.stderr)
+
 
 
 def prompt_pencil_strength(default: str = "normal", sample_path=None) -> str:
@@ -410,11 +434,13 @@ def main():
                     help="Rendering style. 'pencil' = pencil-on-paper look "
                          "(text/dark strokes stay black, paper & mid-tones fade out)")
     ap.add_argument("--pencil-strength",
-                    choices=["subtle", "normal", "extra"], default="normal",
+                    choices=["subtle", "normal", "extra"], default=None,
                     help="Pencil preset for faint text: "
                          "'subtle' (gentle, keeps paper texture), "
                          "'normal' (default, balanced), "
                          "'extra' (extra-visible — aggressive darkening for very faint pencil). "
+                         "Defaults to your last chosen value (saved in "
+                         "~/.jpg2pdf/config.json), or 'normal' on first run. "
                          "Individual --pencil-* flags override the preset.")
     ap.add_argument("--pencil-opacity", type=float, default=None,
                     help="Pencil style: how much non-ink survives (0..1, default 0.25). "
@@ -429,7 +455,26 @@ def main():
     ap.add_argument("--ask-strength", action="store_true",
                     help="When --style pencil, show a desktop dropdown to pick "
                          "subtle/normal/extra before converting.")
+    ap.add_argument("--reset-prefs", action="store_true",
+                    help="Forget the saved pencil-strength preference and exit.")
     args = ap.parse_args()
+
+    # Load persisted prefs (last chosen pencil strength).
+    prefs = load_prefs()
+    if args.reset_prefs:
+        try:
+            CONFIG_PATH.unlink()
+            print(f"Removed {CONFIG_PATH}")
+        except FileNotFoundError:
+            print("No saved prefs to remove.")
+        sys.exit(0)
+
+    # Seed default from saved prefs (CLI value always wins).
+    cli_strength_explicit = args.pencil_strength is not None
+    if not cli_strength_explicit:
+        args.pencil_strength = prefs.get("pencil_strength", "normal")
+        if args.pencil_strength not in PENCIL_PRESETS:
+            args.pencil_strength = "normal"
 
     # ---- Resolve input mode (BEFORE the strength picker so we can pass a
     # real sample image into the live preview) ----
@@ -469,6 +514,12 @@ def main():
         if not cli_overrode:
             args.pencil_strength = prompt_pencil_strength(
                 args.pencil_strength, sample_path=images[0])
+
+    # Persist the resolved strength so the NEXT export reuses it automatically.
+    if args.style == "pencil" and args.pencil_strength in PENCIL_PRESETS:
+        if prefs.get("pencil_strength") != args.pencil_strength:
+            prefs["pencil_strength"] = args.pencil_strength
+            save_prefs(prefs)
 
     # Apply preset (defined at module scope) for any --pencil-* flag the user
     # didn't override on the CLI.

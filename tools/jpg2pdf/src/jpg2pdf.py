@@ -86,11 +86,33 @@ def apply_pencil(im: Image.Image, opacity: float, brightness: float,
         im = bg
     gray = im.convert("L")
 
-    # 2. Auto-level (stretch 1%..99% to 0..255) so dingy scans go truly white.
+    # 2a. Background flattening — divide by a heavily-blurred copy of the page
+    # to remove uneven lighting / shadow gradients from phone photos. This is
+    # the key trick that makes faint pencil pop: paper goes uniformly white,
+    # so the LUT below has more room to darken the actual strokes.
+    bg_blur = gray.filter(ImageFilter.GaussianBlur(radius=max(gray.size) / 30))
+    bg_px   = bg_blur.load()
+    src_px  = gray.load()
+    flat = Image.new("L", gray.size)
+    flat_px = flat.load()
+    for y in range(gray.size[1]):
+        for x in range(gray.size[0]):
+            b = bg_px[x, y] or 1
+            v = src_px[x, y] * 255 // b           # normalise against local paper
+            flat_px[x, y] = 255 if v > 255 else v
+    gray = flat
+
+    # 2b. Auto-level (stretch 1%..99% to 0..255) so dingy scans go truly white.
     gray = ImageOps.autocontrast(gray, cutoff=(1, 1))
 
     # 3. Edge sharpening — recovers crisp pencil-stroke contours.
-    gray = gray.filter(ImageFilter.UnsharpMask(radius=1.2, percent=140, threshold=2))
+    gray = gray.filter(ImageFilter.UnsharpMask(radius=1.4, percent=180, threshold=2))
+
+    # 3b. Gamma < 1 darkens midtones — pulls grey graphite toward black without
+    # crushing paper (paper is already at 255 from the flatten step).
+    gamma = 0.65
+    gamma_lut = [int(round(((v / 255.0) ** gamma) * 255)) for v in range(256)]
+    gray = gray.point(gamma_lut)
 
     # 4. Smoothstep LUT.
     dark_point  = max(0,   min(200, ink_threshold - 20))   # full-ink boundary

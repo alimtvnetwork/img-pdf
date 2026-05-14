@@ -180,10 +180,8 @@ foreach ($ext in $exts) {
 
     foreach ($root in $targets) {
         Register-ParentV2 $root "Jpg2Pdf.FilesMenu"
-        # Enable single-call multi-select on the parent verb
-        $parent = "$root\Jpg2PdfMenu"
-        New-ItemProperty -Path $parent -Name "MultiSelectModel" `
-            -Value "Player" -PropertyType String -Force | Out-Null
+        # MultiSelectModel is set on each LEAF verb inside Build-Submenu —
+        # setting it here on the parent has no effect when ExtendedSubCommandsKey is used.
     }
 }
 

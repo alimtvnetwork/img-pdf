@@ -103,12 +103,18 @@ function Build-Submenu {
     }
     New-Key $base
 
-    function _add($Id, $Label, $ArgsLine) {
+    function _add($Id, $Label, $ArgsLine, [switch]$MultiSelect) {
         $k = "$base\$Id"
         New-Key $k
         Set-ItemProperty -Path $k -Name "(default)" -Value $Label
         New-ItemProperty -Path $k -Name "MUIVerb" -Value $Label -PropertyType String -Force | Out-Null
         New-ItemProperty -Path $k -Name "Icon"    -Value $exe   -PropertyType String -Force | Out-Null
+        # CRITICAL: MultiSelectModel must live on each LEAF verb when using
+        # ExtendedSubCommandsKey. Without it, Explorer invokes the verb once
+        # PER selected file (N consoles, N broken commands).
+        if ($MultiSelect) {
+            New-ItemProperty -Path $k -Name "MultiSelectModel" -Value "Player" -PropertyType String -Force | Out-Null
+        }
         New-Key "$k\command"
         Set-ItemProperty -Path "$k\command" -Name "(default)" `
             -Value ('"' + $exe + '" ' + $ArgsLine)
@@ -124,13 +130,16 @@ function Build-Submenu {
         _add "07_A4_180"  "Convert All to A4 (rotate 180)"          '--size a4 --rotate 180 "%V"'
         _add "08_A4_NOAR" "Convert All to A4 (no auto-rotate)"      '--size a4 --no-auto-rotate "%V"'
     } else {
-        _add "11_A4"      "Convert Selected to A4"                  '--size a4 --files %*'
-        _add "12_Letter"  "Convert Selected to Letter"              '--size letter --files %*'
-        _add "13_Legal"   "Convert Selected to Legal"               '--size legal --files %*'
-        _add "15_A4_CW"   "Convert Selected to A4 (rotate 90 CW)"   '--size a4 --rotate 270 --files %*'
-        _add "16_A4_CCW"  "Convert Selected to A4 (rotate 90 CCW)"  '--size a4 --rotate 90  --files %*'
-        _add "17_A4_180"  "Convert Selected to A4 (rotate 180)"     '--size a4 --rotate 180 --files %*'
-        _add "18_A4_NOAR" "Convert Selected to A4 (no auto-rotate)" '--size a4 --no-auto-rotate --files %*'
+        # Explorer (with MultiSelectModel=Player) invokes the verb ONCE and
+        # appends every selected path as a separate quoted argument after %1.
+        # %* is a cmd.exe-only token and is passed literally here — never use it.
+        _add "11_A4"      "Convert Selected to A4"                  '--size a4 --files "%1"'                  -MultiSelect
+        _add "12_Letter"  "Convert Selected to Letter"              '--size letter --files "%1"'              -MultiSelect
+        _add "13_Legal"   "Convert Selected to Legal"               '--size legal --files "%1"'               -MultiSelect
+        _add "15_A4_CW"   "Convert Selected to A4 (rotate 90 CW)"   '--size a4 --rotate 270 --files "%1"'     -MultiSelect
+        _add "16_A4_CCW"  "Convert Selected to A4 (rotate 90 CCW)"  '--size a4 --rotate 90  --files "%1"'     -MultiSelect
+        _add "17_A4_180"  "Convert Selected to A4 (rotate 180)"     '--size a4 --rotate 180 --files "%1"'     -MultiSelect
+        _add "18_A4_NOAR" "Convert Selected to A4 (no auto-rotate)" '--size a4 --no-auto-rotate --files "%1"' -MultiSelect
     }
 }
 

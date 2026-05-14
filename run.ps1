@@ -140,6 +140,66 @@ function Invoke-Logged {
     }
 }
 
+# ---------- Top-level crash handler ----------
+# Catches ANY unhandled terminating error so the user sees a clean diagnosis
+# (and the window doesn't disappear when run via double-click).
+trap {
+    $err = $_
+    try { _Log "FATAL" (($err | Out-String).Trim()) } catch {}
+    Write-Host ""
+    Write-Host ("  " + ('=' * 60)) -ForegroundColor Red
+    Write-Host "   jpg2pdf installer crashed" -ForegroundColor Red
+    Write-Host ("  " + ('=' * 60)) -ForegroundColor Red
+    Write-Host "  $($err.Exception.Message)" -ForegroundColor Yellow
+    if ($err.InvocationInfo -and $err.InvocationInfo.PositionMessage) {
+        Write-Host ""
+        Write-Host $err.InvocationInfo.PositionMessage -ForegroundColor DarkGray
+    }
+    if ($script:LogFile) {
+        Write-Host ""
+        Write-Host "  Log file: $script:LogFile" -ForegroundColor DarkGray
+        if (Test-Path -LiteralPath $script:LogFile) {
+            Write-Host "  ----- last 40 log lines -----" -ForegroundColor DarkGray
+            try {
+                Get-Content -LiteralPath $script:LogFile -Tail 40 |
+                    ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+            } catch {}
+            Write-Host "  -----------------------------" -ForegroundColor DarkGray
+        }
+        # Also drop a crash dump next to the script so it's easy to find.
+        try {
+            $dumpDir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
+            $dump = Join-Path $dumpDir "jpg2pdf-crash.log"
+            $body = @(
+                "jpg2pdf installer crash @ $(Get-Date -Format o)",
+                ("PSVersion: " + $PSVersionTable.PSVersion),
+                ("OS:        " + [Environment]::OSVersion.VersionString),
+                "",
+                "Message:",
+                $err.Exception.Message,
+                "",
+                "Position:",
+                ($err.InvocationInfo.PositionMessage),
+                "",
+                "Stack:",
+                ($err.ScriptStackTrace),
+                "",
+                "Full log: $script:LogFile"
+            ) -join "`r`n"
+            Set-Content -LiteralPath $dump -Value $body -Encoding UTF8
+            Write-Host "  Crash dump written to: $dump" -ForegroundColor Yellow
+        } catch {}
+    }
+    Write-Host ("  " + ('=' * 60)) -ForegroundColor Red
+    # Pause so a double-clicked window doesn't vanish.
+    if ($Host.Name -eq 'ConsoleHost' -and -not $env:CI -and [Environment]::UserInteractive) {
+        Write-Host ""
+        Write-Host "  Press Enter to close..." -ForegroundColor Yellow
+        try { [void](Read-Host) } catch {}
+    }
+    exit 1
+}
+
 Show-Banner -Version $RunPs1Version
 Info "Log file: $script:LogFile"
 if ($script:VerboseMode) { Info "Verbose mode ON" }

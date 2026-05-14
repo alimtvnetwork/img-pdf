@@ -334,7 +334,19 @@ def main():
                     help="Pencil style: ink multiplier (<1 makes ink blacker).")
     ap.add_argument("--pencil-brightness", type=float, default=None,
                     help="Pencil style: post-process brightness multiplier (default 1.0).")
+    ap.add_argument("--ask-strength", action="store_true",
+                    help="When --style pencil, show a desktop dropdown to pick "
+                         "subtle/normal/extra before converting.")
     args = ap.parse_args()
+
+    # Interactive picker (only meaningful with --style pencil)
+    if args.ask_strength and args.style == "pencil":
+        # Only honor the picker if user didn't already override on the CLI
+        cli_overrode = any(v is not None for v in (
+            args.pencil_opacity, args.pencil_ink_threshold,
+            args.pencil_ink_darken, args.pencil_brightness))
+        if not cli_overrode:
+            args.pencil_strength = prompt_pencil_strength(args.pencil_strength)
 
     # Pencil presets — tuned for faint handwritten text.
     # Override individually with --pencil-opacity / --pencil-ink-threshold /

@@ -107,9 +107,16 @@ function Invoke-Logged {
     $tmpOut = [IO.Path]::GetTempFileName()
     $tmpErr = [IO.Path]::GetTempFileName()
     try {
-        $proc = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList `
-            -NoNewWindow -Wait -PassThru `
-            -RedirectStandardOutput $tmpOut -RedirectStandardError $tmpErr
+        try {
+            $proc = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList `
+                -NoNewWindow -Wait -PassThru `
+                -RedirectStandardOutput $tmpOut -RedirectStandardError $tmpErr
+        } catch {
+            _Log "ERR " ("[$Label] Start-Process threw: " + $_.Exception.Message)
+            Write-Host "  Could not launch '$FilePath': $($_.Exception.Message)" -ForegroundColor Red
+            if (-not $AllowFailure) { Die "$Label could not start ($FilePath)." }
+            return -1
+        }
         $code = $proc.ExitCode
 
         $out = if (Test-Path $tmpOut) { Get-Content -Raw -LiteralPath $tmpOut } else { "" }

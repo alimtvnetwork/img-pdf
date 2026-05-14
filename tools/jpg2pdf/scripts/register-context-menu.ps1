@@ -210,6 +210,7 @@ function Register-SubItems {
 }
 
 Write-Host "[ctx] Registering context menu (HKCU)..." -ForegroundColor Cyan
+Write-SelectedFilesLauncher -Path $script:SelectedLauncherPath
 
 # Build BOTH submenus into the same shared key (folder + file items live
 # together; harmless duplicates won't show because each parent links here).
@@ -254,17 +255,18 @@ function Build-Submenu {
         _add "08_A4_NOAR"   "Convert All to A4 (no auto-rotate)"      '--size a4 --no-auto-rotate "%V"'
         _add "09_A4_PENCIL" "Convert All to A4 (pencil / paper look)" '--size a4 --style pencil "%V"'
     } else {
-        # Explorer (with MultiSelectModel=Player) invokes the verb ONCE and
-        # appends every selected path as a separate quoted argument after %1.
-        # %* is a cmd.exe-only token and is passed literally here — never use it.
-        _add "11_A4"        "Convert Selected to A4"                       '--size a4 --files "%1"'                       -MultiSelect
-        _add "12_Letter"    "Convert Selected to Letter"                   '--size letter --files "%1"'                   -MultiSelect
-        _add "13_Legal"     "Convert Selected to Legal"                    '--size legal --files "%1"'                    -MultiSelect
-        _add "15_A4_CW"     "Convert Selected to A4 (rotate 90 CW)"        '--size a4 --rotate 270 --files "%1"'          -MultiSelect
-        _add "16_A4_CCW"    "Convert Selected to A4 (rotate 90 CCW)"       '--size a4 --rotate 90  --files "%1"'          -MultiSelect
-        _add "17_A4_180"    "Convert Selected to A4 (rotate 180)"          '--size a4 --rotate 180 --files "%1"'          -MultiSelect
-        _add "18_A4_NOAR"   "Convert Selected to A4 (no auto-rotate)"      '--size a4 --no-auto-rotate --files "%1"'      -MultiSelect
-        _add "19_A4_PENCIL" "Convert Selected to A4 (pencil / paper look)" '--size a4 --style pencil --files "%1"'        -MultiSelect
+        $launcher = 'powershell -NoProfile -ExecutionPolicy Bypass -File "' + $script:SelectedLauncherPath + '" -ExePath "' + $exe + '"'
+        # Explorer can still launch legacy per-file verbs on some file classes.
+        # Route every invocation through a tiny queueing launcher so only the
+        # first process opens a console and runs jpg2pdf once for the full batch.
+        _add "11_A4"        "Convert Selected to A4"                       ($launcher + ' -Size a4 "%1"')                             -MultiSelect
+        _add "12_Letter"    "Convert Selected to Letter"                   ($launcher + ' -Size letter "%1"')                         -MultiSelect
+        _add "13_Legal"     "Convert Selected to Legal"                    ($launcher + ' -Size legal "%1"')                          -MultiSelect
+        _add "15_A4_CW"     "Convert Selected to A4 (rotate 90 CW)"        ($launcher + ' -Size a4 -Rotate 270 "%1"')                 -MultiSelect
+        _add "16_A4_CCW"    "Convert Selected to A4 (rotate 90 CCW)"       ($launcher + ' -Size a4 -Rotate 90 "%1"')                  -MultiSelect
+        _add "17_A4_180"    "Convert Selected to A4 (rotate 180)"          ($launcher + ' -Size a4 -Rotate 180 "%1"')                 -MultiSelect
+        _add "18_A4_NOAR"   "Convert Selected to A4 (no auto-rotate)"      ($launcher + ' -Size a4 -NoAutoRotate "%1"')               -MultiSelect
+        _add "19_A4_PENCIL" "Convert Selected to A4 (pencil / paper look)" ($launcher + ' -Size a4 -Style pencil "%1"')               -MultiSelect
     }
 }
 

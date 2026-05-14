@@ -309,6 +309,19 @@ Register-ParentV2 "HKCU:\Software\Classes\Directory\Background\shell" "Jpg2Pdf.F
 # Image file extensions (right-click ON selected images)
 $exts = @(".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff")
 foreach ($ext in $exts) {
+    # Remove older direct file verbs first. If left behind, Explorer may show
+    # duplicate entries and run the old per-file command, which opens one
+    # terminal per selected image.
+    $legacyRoots = @("HKCU:\Software\Classes\SystemFileAssociations\$ext\shell\Jpg2PdfMenu")
+    $oldProgId = (Get-ItemProperty -Path "HKCU:\Software\Classes\$ext" -ErrorAction SilentlyContinue)."(default)"
+    if (-not $oldProgId) {
+        $oldProgId = (Get-ItemProperty -Path "Registry::HKEY_CLASSES_ROOT\$ext" -ErrorAction SilentlyContinue)."(default)"
+    }
+    if ($oldProgId) { $legacyRoots += "HKCU:\Software\Classes\$oldProgId\shell\Jpg2PdfMenu" }
+    foreach ($legacyRoot in $legacyRoots) {
+        if (Test-Path $legacyRoot) { Remove-Item $legacyRoot -Recurse -Force }
+    }
+
     # Resolve the ProgID for this extension; fall back to SystemFileAssociations
     $progId = (Get-ItemProperty -Path "HKCU:\Software\Classes\$ext" -ErrorAction SilentlyContinue)."(default)"
     if (-not $progId) {

@@ -12,7 +12,7 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from PIL import Image, ImageEnhance, ImageFilter, ImageOps
+from PIL import Image, ImageChops, ImageEnhance, ImageFilter, ImageOps
 
 __version__ = "0.8.0"
 
@@ -155,6 +155,7 @@ def apply_pencil(im: Image.Image, opacity: float, brightness: float,
         bg.paste(im.convert("RGBA"), mask=im.convert("RGBA").split()[-1])
         im = bg
     gray = im.convert("L")
+    raw_gray = gray
 
     # 2a. Background flattening — divide by a heavily-blurred copy of the page
     # to remove uneven lighting / shadow gradients from phone photos. This is
@@ -170,6 +171,22 @@ def apply_pencil(im: Image.Image, opacity: float, brightness: float,
         a=gray, b=bg_safe,
     )
 
+    # 2a.1 Stroke-lift mask — recover very faint graphite/text before the
+    # histogram stretch can wash it away.  We compare the original pixels with
+    # the local paper background; anything slightly darker than nearby paper is
+    # amplified into a subtraction mask.  This gives pencil writing actual
+    # depth while leaving flat white paper alone.
+    depth = max(0.0, min(1.0, (ink_threshold - 90) / 75.0))
+    stroke_lift = ImageChops.subtract(bg_blur, raw_gray)
+    stroke_lift = ImageEnhance.Contrast(stroke_lift).enhance(1.8 + 2.6 * depth)
+    lift_floor = 3 if depth < 0.45 else 2
+    lift_gain = 3.2 + 4.8 * depth
+    stroke_lift = stroke_lift.point(
+        lambda v: 0 if v <= lift_floor else min(255, int(round((v - lift_floor) * lift_gain)))
+    )
+    lifted = ImageChops.subtract(gray, stroke_lift.point(lambda v: int(round(v * (0.42 + 0.38 * depth)))))
+    gray = Image.blend(gray, lifted, 0.28 + 0.42 * depth)
+
     # 2b. Auto-level (stretch 1%..99% to 0..255) so dingy scans go truly white.
     gray = ImageOps.autocontrast(gray, cutoff=(1, 1))
 
@@ -180,10 +197,12 @@ def apply_pencil(im: Image.Image, opacity: float, brightness: float,
     # blends them back into the original so faint pencil/text gains body without
     # turning the paper grey. Stronger presets raise ink_threshold, which also
     # increases this depth pass.
-    depth = max(0.0, min(1.0, (ink_threshold - 90) / 75.0))
     gray = ImageEnhance.Contrast(gray).enhance(1.08 + 0.20 * depth)
     stroke_shadow = gray.filter(ImageFilter.MinFilter(3))
-    gray = Image.blend(gray, stroke_shadow, 0.14 + 0.24 * depth)
+    if depth > 0.55:
+        wider_shadow = gray.filter(ImageFilter.MinFilter(5))
+        stroke_shadow = Image.blend(stroke_shadow, wider_shadow, 0.10 + 0.18 * depth)
+    gray = Image.blend(gray, stroke_shadow, 0.18 + 0.30 * depth)
 
     # 3c. Gamma > 1 darkens midtones — pulls grey graphite toward black without
     # crushing paper (paper is already near 255 from the flatten step).
@@ -352,9 +371,9 @@ def main():
     # Override individually with --pencil-opacity / --pencil-ink-threshold /
     # --pencil-ink-darken / --pencil-brightness.
     PENCIL_PRESETS = {
-        "subtle": dict(opacity=0.35, ink_threshold=95,  ink_darken=0.60, brightness=1.0),
-        "normal": dict(opacity=0.25, ink_threshold=110, ink_darken=0.45, brightness=1.0),
-        "extra":  dict(opacity=0.15, ink_threshold=140, ink_darken=0.20, brightness=1.05),
+        "subtle": dict(opacity=0.32, ink_threshold=105, ink_darken=0.52, brightness=1.0),
+        "normal": dict(opacity=0.20, ink_threshold=128, ink_darken=0.32, brightness=1.0),
+        "extra":  dict(opacity=0.10, ink_threshold=165, ink_darken=0.12, brightness=1.02),
     }
     preset = PENCIL_PRESETS[args.pencil_strength]
     if args.pencil_opacity       is None: args.pencil_opacity       = preset["opacity"]

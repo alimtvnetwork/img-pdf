@@ -1,1 +1,4 @@
 pillow>=10.0
+pypdf>=4.0
+xhtml2pdf>=0.2.13
+docx2pdf>=0.1.8

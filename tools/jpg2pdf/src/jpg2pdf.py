@@ -51,44 +51,77 @@ def collect_from_list(paths):
 
 def apply_pencil(im: Image.Image, opacity: float, brightness: float,
                  ink_threshold: int = 90, ink_darken: float = 0.65) -> Image.Image:
-    """Make the image look like pencil writing on paper.
+    """Render the image as crisp pencil writing on clean paper.
 
-    Approach: a smooth S-curve (contrast remap) so dark strokes stay solid
-    black while paper / mid-tones / shading roll off to white. This keeps
-    anti-aliased text edges intact (a hard threshold would chop them off and
-    make small text look pixelated).
+    Pipeline:
+      1. Flatten onto white (kill any alpha haze) and convert to grayscale
+         using luminance — picks up colored ink/text as well as black.
+      2. Auto-stretch the histogram (1% / 99%) so a slightly grey scan is
+         pulled to true white-paper range before the LUT runs. This is the
+         single biggest quality win versus a naive contrast curve.
+      3. Unsharp-mask to recover stroke crispness (graphite edges) before
+         we flatten tones.
+      4. Smoothstep LUT: anything darker than `dark_point` is treated as
+         pure ink (multiplied by `ink_darken` so it stays solid black),
+         anything lighter than `light_point` snaps to paper white, and the
+         band between them gets an anti-aliased ramp so small text edges
+         don't break up.
 
-      contrast = 1 + (1 - opacity) * 4
-      out = clamp( ((v/255 - 0.5) * contrast + 0.5) * 255 )
-
-    opacity:    overall darkness of non-ink (0..1). Lower = whiter paper.
-                Default 0.25 → contrast=4 → ink stays black, paper goes white.
-    brightness: post multiplier (default 1.0 = none).
-    ink_threshold / ink_darken: legacy knobs, kept for CLI compat. When
-        ink_threshold > 0 we additionally darken pixels at or below it by
-        `ink_darken` so very dark ink can be made even blacker on demand.
+    opacity:    how aggressive the paper-whitening is (0..1).
+                Lower  → wider whitening band, cleaner page.
+                Default 0.25 → light_point ≈ 215, dark_point ≈ 70.
+    brightness: post brightness multiplier (1.0 = none).
+    ink_threshold: pixel value (0..255) that defines "definitely ink".
+                   Pixels at or below get the full ink_darken treatment.
+    ink_darken: ink multiplier (<1 makes ink blacker; default 0.55).
     """
     opacity    = max(0.0, min(1.0, opacity))
     brightness = max(0.1, brightness)
-    ink_darken = max(0.1, min(1.0, ink_darken))
+    ink_darken = max(0.05, min(1.0, ink_darken))
 
-    contrast = 1.0 + (1.0 - opacity) * 4.0
+    # 1. Flatten alpha → white, then luminance-grayscale.
+    if im.mode in ("RGBA", "LA") or (im.mode == "P" and "transparency" in im.info):
+        bg = Image.new("RGB", im.size, (255, 255, 255))
+        bg.paste(im.convert("RGBA"), mask=im.convert("RGBA").split()[-1])
+        im = bg
+    gray = im.convert("L")
+
+    # 2. Auto-level (stretch 1%..99% to 0..255) so dingy scans go truly white.
+    gray = ImageOps.autocontrast(gray, cutoff=(1, 1))
+
+    # 3. Edge sharpening — recovers crisp pencil-stroke contours.
+    gray = gray.filter(ImageFilter.UnsharpMask(radius=1.2, percent=140, threshold=2))
+
+    # 4. Smoothstep LUT.
+    dark_point  = max(0,   min(200, ink_threshold - 20))   # full-ink boundary
+    light_point = max(dark_point + 10,
+                      int(round(255 - 40 * opacity)))      # paper-white boundary
+                                                            # opacity 0 → 255, opacity 1 → 215
+    span = max(1, light_point - dark_point)
 
     lut = []
     for v in range(256):
-        # S-curve / contrast around mid-gray.
-        t = ((v / 255.0) - 0.5) * contrast + 0.5
-        out = int(round(max(0.0, min(1.0, t)) * 255))
-        # Optional extra darken for very dark ink.
-        if v <= ink_threshold:
-            out = min(out, int(round(v * ink_darken)))
-        lut.append(out)
+        if v <= dark_point:
+            # Solid ink: darken aggressively so writing reads jet black.
+            out = int(round(v * ink_darken))
+        elif v >= light_point:
+            # Paper.
+            out = 255
+        else:
+            # Smoothstep ramp ink → paper.
+            t = (v - dark_point) / span
+            s = t * t * (3 - 2 * t)                        # smoothstep
+            ink_val   = v * ink_darken
+            paper_val = 255
+            out = int(round(ink_val + (paper_val - ink_val) * s))
+        lut.append(max(0, min(255, out)))
 
-    im = im.convert("RGB")
-    im = im.point(lut * 3)  # apply to R, G, B channels
+    gray = gray.point(lut)
+
     if brightness != 1.0:
-        im = ImageEnhance.Brightness(im).enhance(brightness)
-    return im
+        gray = ImageEnhance.Brightness(gray).enhance(brightness)
+
+    return gray.convert("RGB")
 
 
 def make_page(img_path: Path, page_w_pt: float, page_h_pt: float,

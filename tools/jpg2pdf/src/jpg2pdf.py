@@ -711,6 +711,19 @@ def main():
     if not images:
         print("No images to convert.", file=sys.stderr); sys.exit(1)
 
+    # Optional: confirm/deselect images via thumbnail grid before conversion.
+    if args.preview_grid:
+        kept = prompt_thumbnail_grid(images,
+                                     thumb_px=max(48, args.thumb_size),
+                                     cols=max(1, args.thumb_cols))
+        if kept is None:
+            print("Cancelled by user.", file=sys.stderr); sys.exit(130)
+        if not kept:
+            print("No images selected — nothing to convert.", file=sys.stderr); sys.exit(1)
+        if len(kept) != len(images):
+            print(f"  preview-grid: kept {len(kept)} of {len(images)} image(s)")
+        images = kept
+
     # Interactive picker with LIVE preview (only meaningful with --style pencil)
     if args.ask_strength and args.style == "pencil":
         cli_overrode = any(v is not None for v in (

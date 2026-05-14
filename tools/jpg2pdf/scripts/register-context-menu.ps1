@@ -127,6 +127,7 @@ $args = @("--size", $Size)
 if ($Rotate -ge 0) { $args += @("--rotate", [string]$Rotate) }
 if ($NoAutoRotate) { $args += "--no-auto-rotate" }
 if ($Style) { $args += @("--style", $Style) }
+if ($Style -eq "pencil") { $args += "--ask-strength" }
 $args += @("--files-from", $listFile)
 $quotedArgs = ($args | ForEach-Object { Quote-CmdArg ([string]$_) }) -join " "
 

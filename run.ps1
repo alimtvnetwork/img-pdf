@@ -140,6 +140,7 @@ function Invoke-Logged {
     }
 }
 
+Show-Banner -Version $RunPs1Version
 Info "Log file: $script:LogFile"
 if ($script:VerboseMode) { Info "Verbose mode ON" }
 

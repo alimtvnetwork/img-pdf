@@ -91,16 +91,11 @@ def apply_pencil(im: Image.Image, opacity: float, brightness: float,
     # the key trick that makes faint pencil pop: paper goes uniformly white,
     # so the LUT below has more room to darken the actual strokes.
     bg_blur = gray.filter(ImageFilter.GaussianBlur(radius=max(gray.size) / 30))
-    bg_px   = bg_blur.load()
-    src_px  = gray.load()
-    flat = Image.new("L", gray.size)
-    flat_px = flat.load()
-    for y in range(gray.size[1]):
-        for x in range(gray.size[0]):
-            b = bg_px[x, y] or 1
-            v = src_px[x, y] * 255 // b           # normalise against local paper
-            flat_px[x, y] = 255 if v > 255 else v
-    gray = flat
+    from PIL import ImageMath
+    gray = ImageMath.eval(
+        "convert(min(255, (a * 255) / max(b, 1)), 'L')",
+        a=gray, b=bg_blur,
+    )
 
     # 2b. Auto-level (stretch 1%..99% to 0..255) so dingy scans go truly white.
     gray = ImageOps.autocontrast(gray, cutoff=(1, 1))

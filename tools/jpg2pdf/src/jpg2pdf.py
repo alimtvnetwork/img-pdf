@@ -14,7 +14,77 @@ import sys
 from pathlib import Path
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
-__version__ = "0.7.1"
+__version__ = "0.8.0"
+
+
+def prompt_pencil_strength(default: str = "normal") -> str:
+    """Show a small Tk dropdown to pick pencil strength.
+
+    Returns the chosen value ('subtle' | 'normal' | 'extra'), or `default`
+    if Tk is unavailable or the user cancels.
+    """
+    try:
+        import tkinter as tk
+        from tkinter import ttk
+    except Exception:
+        return default
+
+    choices = ["subtle", "normal", "extra"]
+    descriptions = {
+        "subtle": "Subtle  — gentle, keeps paper texture",
+        "normal": "Normal  — balanced (default)",
+        "extra":  "Extra visible — aggressive darkening for very faint pencil",
+    }
+    result = {"value": default}
+
+    try:
+        root = tk.Tk()
+    except Exception:
+        return default
+
+    root.title("jpg2pdf — Pencil strength")
+    try:
+        root.attributes("-topmost", True)
+    except Exception:
+        pass
+    root.resizable(False, False)
+
+    frm = ttk.Frame(root, padding=16)
+    frm.grid(row=0, column=0, sticky="nsew")
+    ttk.Label(frm, text="Choose pencil rendering strength:").grid(
+        row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
+
+    var = tk.StringVar(value=descriptions.get(default, descriptions["normal"]))
+    combo = ttk.Combobox(frm, textvariable=var, state="readonly",
+                         values=[descriptions[c] for c in choices], width=46)
+    combo.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 12))
+
+    def _ok(_evt=None):
+        sel = var.get()
+        for c in choices:
+            if descriptions[c] == sel:
+                result["value"] = c
+                break
+        root.destroy()
+
+    def _cancel(_evt=None):
+        root.destroy()
+
+    ttk.Button(frm, text="Cancel", command=_cancel).grid(row=2, column=0, sticky="e", padx=(0, 6))
+    ok_btn = ttk.Button(frm, text="Convert", command=_ok)
+    ok_btn.grid(row=2, column=1, sticky="w")
+    root.bind("<Return>", _ok)
+    root.bind("<Escape>", _cancel)
+    ok_btn.focus_set()
+
+    # Center on screen
+    root.update_idletasks()
+    w = root.winfo_width(); h = root.winfo_height()
+    sw = root.winfo_screenwidth(); sh = root.winfo_screenheight()
+    root.geometry(f"+{(sw - w) // 2}+{(sh - h) // 3}")
+
+    root.mainloop()
+    return result["value"]
 
 PAGE_SIZES = {  # points (1/72 inch)
     "a4":     (595.28, 841.89),

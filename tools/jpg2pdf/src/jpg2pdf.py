@@ -171,12 +171,18 @@ def main():
     ap.add_argument("--no-auto-rotate", action="store_true",
                     help="Shortcut for --auto-rotate off")
     ap.add_argument("--style", choices=["none", "pencil"], default="none",
-                    help="Rendering style. 'pencil' = faint pencil-on-paper look "
-                         "(reduced opacity + boosted brightness)")
-    ap.add_argument("--pencil-opacity", type=float, default=0.4,
-                    help="Pencil style: image opacity over white (0..1, default 0.4)")
-    ap.add_argument("--pencil-brightness", type=float, default=1.25,
-                    help="Pencil style: brightness multiplier (default 1.25)")
+                    help="Rendering style. 'pencil' = pencil-on-paper look "
+                         "(text/dark strokes stay black, paper & mid-tones fade out)")
+    ap.add_argument("--pencil-opacity", type=float, default=0.25,
+                    help="Pencil style: how much non-ink survives (0..1, default 0.25). "
+                         "Lower = whiter paper.")
+    ap.add_argument("--pencil-ink-threshold", type=int, default=90,
+                    help="Pencil style: pixel value (0..255) below which a pixel is "
+                         "treated as ink and kept dark (default 90).")
+    ap.add_argument("--pencil-ink-darken", type=float, default=0.65,
+                    help="Pencil style: ink multiplier (<1 makes ink blacker, default 0.65).")
+    ap.add_argument("--pencil-brightness", type=float, default=1.0,
+                    help="Pencil style: post-process brightness multiplier (default 1.0).")
     args = ap.parse_args()
 
     # ---- Resolve input mode ----

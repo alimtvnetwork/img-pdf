@@ -113,7 +113,12 @@ jpg2pdf ./notes --size a4 --style pencil
 jpg2pdf ./notes --size a4 --style pencil --ask-strength   # pick subtle/normal/extra-visible
 ```
 
-Supported inputs: `.jpg .jpeg .png .webp .bmp .tif .tiff` (sorted naturally).
+Supported inputs: `.jpg .jpeg .png .webp .bmp .tif .tiff .pdf .html .htm .docx .doc`
+(sorted naturally; mixed selections are merged into one PDF in selection order).
+
+<div align="center">
+  <img src="tools/jpg2pdf/docs/demo.gif" alt="jpg2pdf demo — selecting mixed files and combining into one PDF" width="720"/>
+</div>
 
 ### ✏️ Pencil strength — three depths
 
@@ -132,11 +137,15 @@ Pick interactively with `--ask-strength`, or pass `--pencil-opacity` /
 
 After install, right-click works two ways — both route through a **single terminal**:
 
-- **On a folder** → *Combine images into PDF* / *Combine images into PDF (pencil)*
-- **On selected images** → same actions, but only the highlighted files are queued
+- **On a folder** → *Combine into PDF* / *Combine into PDF (pencil)*
+- **On selected files** → mix images, PDFs, HTML, and Word docs in any order; they're merged into one PDF
 
 No more 30 terminals popping up for 30 selected files. The launcher batches
 everything into one conversion call.
+
+<div align="center">
+  <img src="tools/jpg2pdf/docs/context-menu.png" alt="Windows Explorer right-click menu showing 'Combine into PDF' submenu" width="520"/>
+</div>
 
 ---
 

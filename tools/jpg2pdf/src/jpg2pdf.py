@@ -515,6 +515,12 @@ def main():
             args.pencil_strength = prompt_pencil_strength(
                 args.pencil_strength, sample_path=images[0])
 
+    # Persist the resolved strength so the NEXT export reuses it automatically.
+    if args.style == "pencil" and args.pencil_strength in PENCIL_PRESETS:
+        if prefs.get("pencil_strength") != args.pencil_strength:
+            prefs["pencil_strength"] = args.pencil_strength
+            save_prefs(prefs)
+
     # Apply preset (defined at module scope) for any --pencil-* flag the user
     # didn't override on the CLI.
     preset = PENCIL_PRESETS[args.pencil_strength]

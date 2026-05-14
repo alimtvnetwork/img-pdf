@@ -128,18 +128,20 @@ function Build-Submenu {
         _add "05_A4_CW"   "Convert All to A4 (rotate 90 CW)"        '--size a4 --rotate 270 "%V"'
         _add "06_A4_CCW"  "Convert All to A4 (rotate 90 CCW)"       '--size a4 --rotate 90  "%V"'
         _add "07_A4_180"  "Convert All to A4 (rotate 180)"          '--size a4 --rotate 180 "%V"'
-        _add "08_A4_NOAR" "Convert All to A4 (no auto-rotate)"      '--size a4 --no-auto-rotate "%V"'
+        _add "08_A4_NOAR"   "Convert All to A4 (no auto-rotate)"      '--size a4 --no-auto-rotate "%V"'
+        _add "09_A4_PENCIL" "Convert All to A4 (pencil / paper look)" '--size a4 --style pencil "%V"'
     } else {
         # Explorer (with MultiSelectModel=Player) invokes the verb ONCE and
         # appends every selected path as a separate quoted argument after %1.
         # %* is a cmd.exe-only token and is passed literally here — never use it.
-        _add "11_A4"      "Convert Selected to A4"                  '--size a4 --files "%1"'                  -MultiSelect
-        _add "12_Letter"  "Convert Selected to Letter"              '--size letter --files "%1"'              -MultiSelect
-        _add "13_Legal"   "Convert Selected to Legal"               '--size legal --files "%1"'               -MultiSelect
-        _add "15_A4_CW"   "Convert Selected to A4 (rotate 90 CW)"   '--size a4 --rotate 270 --files "%1"'     -MultiSelect
-        _add "16_A4_CCW"  "Convert Selected to A4 (rotate 90 CCW)"  '--size a4 --rotate 90  --files "%1"'     -MultiSelect
-        _add "17_A4_180"  "Convert Selected to A4 (rotate 180)"     '--size a4 --rotate 180 --files "%1"'     -MultiSelect
-        _add "18_A4_NOAR" "Convert Selected to A4 (no auto-rotate)" '--size a4 --no-auto-rotate --files "%1"' -MultiSelect
+        _add "11_A4"        "Convert Selected to A4"                       '--size a4 --files "%1"'                       -MultiSelect
+        _add "12_Letter"    "Convert Selected to Letter"                   '--size letter --files "%1"'                   -MultiSelect
+        _add "13_Legal"     "Convert Selected to Legal"                    '--size legal --files "%1"'                    -MultiSelect
+        _add "15_A4_CW"     "Convert Selected to A4 (rotate 90 CW)"        '--size a4 --rotate 270 --files "%1"'          -MultiSelect
+        _add "16_A4_CCW"    "Convert Selected to A4 (rotate 90 CCW)"       '--size a4 --rotate 90  --files "%1"'          -MultiSelect
+        _add "17_A4_180"    "Convert Selected to A4 (rotate 180)"          '--size a4 --rotate 180 --files "%1"'          -MultiSelect
+        _add "18_A4_NOAR"   "Convert Selected to A4 (no auto-rotate)"      '--size a4 --no-auto-rotate --files "%1"'      -MultiSelect
+        _add "19_A4_PENCIL" "Convert Selected to A4 (pencil / paper look)" '--size a4 --style pencil --files "%1"'        -MultiSelect
     }
 }
 

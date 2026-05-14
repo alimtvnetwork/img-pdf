@@ -7,19 +7,19 @@ See [`spec/SPEC.md`](spec/SPEC.md) for the full specification.
 
 ## Install — one-liner (prebuilt binaries from GitHub Releases)
 
-Replace `OWNER/REPO` with this repo's GitHub path.
+Override the repo at any time with `JPG2PDF_REPO=other-user/other-repo` (env var).
 
 ### Windows (PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/OWNER/REPO/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 ```
 
 Pin a version, or skip the Explorer context-menu:
 
 ```powershell
-$env:JPG2PDF_VERSION = "v0.5.0"; irm https://raw.githubusercontent.com/OWNER/REPO/main/install.ps1 | iex
-$env:JPG2PDF_NO_CONTEXT_MENU = "1"; irm https://raw.githubusercontent.com/OWNER/REPO/main/install.ps1 | iex
+$env:JPG2PDF_VERSION = "v0.5.0"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
+$env:JPG2PDF_NO_CONTEXT_MENU = "1"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 ```
 
 Drops `jpg2pdf.exe` into `%USERPROFILE%\Tools\bin`, adds it to **User PATH**,
@@ -28,13 +28,13 @@ and registers Explorer right-click entries. Open a new terminal afterwards.
 ### macOS / Linux (curl)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | sh
 ```
 
 Options via env vars:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh \
   | JPG2PDF_VERSION=v0.5.0 JPG2PDF_PREFIX=$HOME/bin sh
 ```
 
@@ -42,9 +42,15 @@ Drops `jpg2pdf` into `$HOME/.local/bin` (override with `JPG2PDF_PREFIX`).
 The script tells you the exact `export PATH=...` line to add if that
 folder isn't on `PATH` yet.
 
+> **macOS note:** binaries are **ad-hoc signed** (not Apple-notarized).
+> The installer auto-strips `com.apple.quarantine`, so the CLI works
+> straight after `curl | sh`. If you download the `.zip` from the
+> Releases page manually, run once:
+> `xattr -dr com.apple.quarantine ~/.local/bin/jpg2pdf`
+
 Prebuilt assets published by `.github/workflows/release.yml`:
-`jpg2pdf-windows-x64.exe`, `jpg2pdf-linux-x64`, `jpg2pdf-macos-x64`,
-`jpg2pdf-macos-arm64`, plus `SHA256SUMS.txt`.
+`jpg2pdf-windows-x64.exe`, `jpg2pdf-linux-x64`, `jpg2pdf-linux-arm64`,
+`jpg2pdf-macos-x64`, `jpg2pdf-macos-arm64`, plus `SHA256SUMS.txt`.
 
 ## Use
 

@@ -32,11 +32,15 @@ jobs:
             label: linux-x64
             asset: jpg2pdf-linux-x64
             ext: ""
-          - os: macos-13          # Intel runner
+          - os: ubuntu-24.04-arm   # free arm64 runner for public repos
+            label: linux-arm64
+            asset: jpg2pdf-linux-arm64
+            ext: ""
+          - os: macos-13           # Intel runner
             label: macos-x64
             asset: jpg2pdf-macos-x64
             ext: ""
-          - os: macos-14          # Apple Silicon runner
+          - os: macos-14           # Apple Silicon runner
             label: macos-arm64
             asset: jpg2pdf-macos-arm64
             ext: ""
@@ -65,6 +69,15 @@ jobs:
         shell: bash
         run: |
           mv "dist/jpg2pdf${{ matrix.ext }}" "dist/${{ matrix.asset }}"
+
+      # Ad-hoc codesign (no Apple Developer ID required). The binary will run,
+      # but Gatekeeper still quarantines it on first download — users either
+      # right-click → Open, or run: xattr -dr com.apple.quarantine ./jpg2pdf
+      - name: Ad-hoc codesign (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          codesign --force --deep --sign - "dist/${{ matrix.asset }}"
+          codesign --verify --verbose=2 "dist/${{ matrix.asset }}"
 
       - name: Smoke test
         shell: bash
@@ -117,6 +130,7 @@ jobs:
           files: |
             dist/jpg2pdf-windows-x64.exe
             dist/jpg2pdf-linux-x64
+            dist/jpg2pdf-linux-arm64
             dist/jpg2pdf-macos-x64
             dist/jpg2pdf-macos-arm64
             dist/SHA256SUMS.txt

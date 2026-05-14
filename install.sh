@@ -2,10 +2,10 @@
 # One-liner installer for jpg2pdf on Linux & macOS.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | sh
 #
 #   # Pin a specific version:
-#   curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | JPG2PDF_VERSION=v0.5.0 sh
+#   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | JPG2PDF_VERSION=v0.5.0 sh
 #
 #   # Install elsewhere (default: $HOME/.local/bin):
 #   curl -fsSL https://.../install.sh | JPG2PDF_PREFIX=$HOME/bin sh
@@ -18,7 +18,7 @@
 
 set -eu
 
-REPO="${JPG2PDF_REPO:-OWNER/REPO}"
+REPO="${JPG2PDF_REPO:-alimtvnetwork/img-pdf}"
 VERSION="${JPG2PDF_VERSION:-}"
 PREFIX="${JPG2PDF_PREFIX:-$HOME/.local/bin}"
 
@@ -26,8 +26,8 @@ info() { printf '\033[36m[jpg2pdf]\033[0m %s\n' "$*"; }
 warn() { printf '\033[33m[jpg2pdf]\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[31m[jpg2pdf]\033[0m %s\n' "$*" >&2; exit 1; }
 
-if [ "$REPO" = "OWNER/REPO" ]; then
-  die "Set the repo: JPG2PDF_REPO=your-user/your-repo curl ... | sh  (or edit install.sh)."
+if [ -z "$REPO" ]; then
+  die "Set the repo: JPG2PDF_REPO=your-user/your-repo curl ... | sh"
 fi
 
 # --- detect platform -------------------------------------------------------
@@ -45,10 +45,10 @@ case "$uname_m" in
 esac
 
 # Linux arm64 is not currently published — fall through with a clear error.
+# Asset names match the GitHub Release uploads.
 asset="jpg2pdf-${os}-${arch}"
 case "$asset" in
   jpg2pdf-windows-*) die "Use install.ps1 on Windows." ;;
-  jpg2pdf-linux-arm64) die "No prebuilt binary for linux/arm64. Build from source: see README." ;;
 esac
 
 # --- pick a downloader -----------------------------------------------------
@@ -81,6 +81,11 @@ target="$PREFIX/jpg2pdf"
 info "Downloading $url"
 DL "$url" "$target" || die "Download failed: $url"
 chmod +x "$target"
+
+# --- macOS: strip quarantine flag (binary is ad-hoc signed, not notarized) -
+if [ "$os" = "macos" ] && command -v xattr >/dev/null 2>&1; then
+  xattr -dr com.apple.quarantine "$target" 2>/dev/null || true
+fi
 
 # --- smoke test ------------------------------------------------------------
 if "$target" --version >/dev/null 2>&1; then

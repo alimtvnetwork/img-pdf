@@ -58,9 +58,12 @@ foreach ($raw in $FilePath) {
 $paths = $paths | Select-Object -Unique
 if (-not $paths -or -not (Test-Path -LiteralPath $ExePath)) { exit 1 }
 
-$firstDir = Split-Path -Parent $paths[0]
 $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-$keySource = "$sid|$firstDir|$Size|$Style|$Rotate|$([bool]$NoAutoRotate)"
+# Group by the selected action, not by the first file path. Explorer can invoke
+# legacy file verbs once per selected file, and mixed-folder selections otherwise
+# split into several batches. The queue below coalesces those invocations into
+# one visible terminal and one jpg2pdf run.
+$keySource = "$sid|selected|$Size|$Style|$Rotate|$([bool]$NoAutoRotate)"
 $key = Get-SafeHash $keySource
 $queueRoot = Join-Path $env:TEMP "jpg2pdf-selected-queue"
 New-Item -ItemType Directory -Force -Path $queueRoot | Out-Null
@@ -90,12 +93,13 @@ try {
 
 if (-not $leader) { exit 0 }
 
-$deadline = (Get-Date).AddSeconds(6)
+$deadline = (Get-Date).AddSeconds(15)
+$quietFor = [TimeSpan]::FromMilliseconds(1800)
 do {
-    $before = if (Test-Path -LiteralPath $queueFile) { (Get-Item -LiteralPath $queueFile).LastWriteTimeUtc } else { Get-Date }
-    Start-Sleep -Milliseconds 900
-    $after = if (Test-Path -LiteralPath $queueFile) { (Get-Item -LiteralPath $queueFile).LastWriteTimeUtc } else { Get-Date }
-} while ($after -ne $before -and (Get-Date) -lt $deadline)
+    Start-Sleep -Milliseconds 300
+    $lastWrite = if (Test-Path -LiteralPath $queueFile) { (Get-Item -LiteralPath $queueFile).LastWriteTimeUtc } else { [DateTime]::UtcNow }
+    $quiet = ([DateTime]::UtcNow - $lastWrite) -ge $quietFor
+} while (-not $quiet -and (Get-Date) -lt $deadline)
 
 $mutex = New-Object System.Threading.Mutex($false, $mutexName)
 try {
@@ -111,6 +115,8 @@ try {
 }
 
 if (-not $all -or $all.Count -eq 0) { exit 0 }
+
+$firstDir = Split-Path -Parent $all[0]
 
 $listFile = Join-Path $queueRoot ("files-" + $key + "-" + [Guid]::NewGuid().ToString("N") + ".txt")
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -265,14 +271,14 @@ function Build-Submenu {
         # Explorer can still launch legacy per-file verbs on some file classes.
         # Route every invocation through a tiny queueing launcher so only the
         # first process opens a console and runs jpg2pdf once for the full batch.
-        _add "11_A4"        "Convert Selected to A4"                       ($launcher + ' -Size a4 "%1"')                             -MultiSelect -RawCommand
-        _add "12_Letter"    "Convert Selected to Letter"                   ($launcher + ' -Size letter "%1"')                         -MultiSelect -RawCommand
-        _add "13_Legal"     "Convert Selected to Legal"                    ($launcher + ' -Size legal "%1"')                          -MultiSelect -RawCommand
-        _add "15_A4_CW"     "Convert Selected to A4 (rotate 90 CW)"        ($launcher + ' -Size a4 -Rotate 270 "%1"')                 -MultiSelect -RawCommand
-        _add "16_A4_CCW"    "Convert Selected to A4 (rotate 90 CCW)"       ($launcher + ' -Size a4 -Rotate 90 "%1"')                  -MultiSelect -RawCommand
-        _add "17_A4_180"    "Convert Selected to A4 (rotate 180)"          ($launcher + ' -Size a4 -Rotate 180 "%1"')                 -MultiSelect -RawCommand
-        _add "18_A4_NOAR"   "Convert Selected to A4 (no auto-rotate)"      ($launcher + ' -Size a4 -NoAutoRotate "%1"')               -MultiSelect -RawCommand
-        _add "19_A4_PENCIL" "Convert Selected to A4 (pencil / paper look)" ($launcher + ' -Size a4 -Style pencil "%1"')               -MultiSelect -RawCommand
+        _add "11_A4"        "Convert Selected to A4"                       ($launcher + ' -Size a4 %*')                             -MultiSelect -RawCommand
+        _add "12_Letter"    "Convert Selected to Letter"                   ($launcher + ' -Size letter %*')                         -MultiSelect -RawCommand
+        _add "13_Legal"     "Convert Selected to Legal"                    ($launcher + ' -Size legal %*')                          -MultiSelect -RawCommand
+        _add "15_A4_CW"     "Convert Selected to A4 (rotate 90 CW)"        ($launcher + ' -Size a4 -Rotate 270 %*')                 -MultiSelect -RawCommand
+        _add "16_A4_CCW"    "Convert Selected to A4 (rotate 90 CCW)"       ($launcher + ' -Size a4 -Rotate 90 %*')                  -MultiSelect -RawCommand
+        _add "17_A4_180"    "Convert Selected to A4 (rotate 180)"          ($launcher + ' -Size a4 -Rotate 180 %*')                 -MultiSelect -RawCommand
+        _add "18_A4_NOAR"   "Convert Selected to A4 (no auto-rotate)"      ($launcher + ' -Size a4 -NoAutoRotate %*')               -MultiSelect -RawCommand
+        _add "19_A4_PENCIL" "Convert Selected to A4 (pencil / paper look)" ($launcher + ' -Size a4 -Style pencil %*')               -MultiSelect -RawCommand
     }
 }
 
@@ -303,6 +309,19 @@ Register-ParentV2 "HKCU:\Software\Classes\Directory\Background\shell" "Jpg2Pdf.F
 # Image file extensions (right-click ON selected images)
 $exts = @(".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff")
 foreach ($ext in $exts) {
+    # Remove older direct file verbs first. If left behind, Explorer may show
+    # duplicate entries and run the old per-file command, which opens one
+    # terminal per selected image.
+    $legacyRoots = @("HKCU:\Software\Classes\SystemFileAssociations\$ext\shell\Jpg2PdfMenu")
+    $oldProgId = (Get-ItemProperty -Path "HKCU:\Software\Classes\$ext" -ErrorAction SilentlyContinue)."(default)"
+    if (-not $oldProgId) {
+        $oldProgId = (Get-ItemProperty -Path "Registry::HKEY_CLASSES_ROOT\$ext" -ErrorAction SilentlyContinue)."(default)"
+    }
+    if ($oldProgId) { $legacyRoots += "HKCU:\Software\Classes\$oldProgId\shell\Jpg2PdfMenu" }
+    foreach ($legacyRoot in $legacyRoots) {
+        if (Test-Path $legacyRoot) { Remove-Item $legacyRoot -Recurse -Force }
+    }
+
     # Resolve the ProgID for this extension; fall back to SystemFileAssociations
     $progId = (Get-ItemProperty -Path "HKCU:\Software\Classes\$ext" -ErrorAction SilentlyContinue)."(default)"
     if (-not $progId) {

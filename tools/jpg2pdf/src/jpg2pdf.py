@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
-__version__ = "0.7.0"
+__version__ = "0.7.1"
 
 PAGE_SIZES = {  # points (1/72 inch)
     "a4":     (595.28, 841.89),
@@ -106,9 +106,18 @@ def apply_pencil(im: Image.Image, opacity: float, brightness: float,
     # 3. Edge sharpening — recovers crisp pencil-stroke contours.
     gray = gray.filter(ImageFilter.UnsharpMask(radius=1.4, percent=180, threshold=2))
 
-    # 3b. Gamma < 1 darkens midtones — pulls grey graphite toward black without
-    # crushing paper (paper is already at 255 from the flatten step).
-    gamma = 0.65
+    # 3b. Stroke-depth pass. A small MinFilter expands only dark strokes, then
+    # blends them back into the original so faint pencil/text gains body without
+    # turning the paper grey. Stronger presets raise ink_threshold, which also
+    # increases this depth pass.
+    depth = max(0.0, min(1.0, (ink_threshold - 90) / 75.0))
+    gray = ImageEnhance.Contrast(gray).enhance(1.08 + 0.20 * depth)
+    stroke_shadow = gray.filter(ImageFilter.MinFilter(3))
+    gray = Image.blend(gray, stroke_shadow, 0.14 + 0.24 * depth)
+
+    # 3c. Gamma > 1 darkens midtones — pulls grey graphite toward black without
+    # crushing paper (paper is already near 255 from the flatten step).
+    gamma = 1.12 + 0.30 * depth
     gamma_lut = [int(round(((v / 255.0) ** gamma) * 255)) for v in range(256)]
     gray = gray.point(gamma_lut)
 

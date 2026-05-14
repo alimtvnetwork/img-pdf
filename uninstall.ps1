@@ -60,7 +60,7 @@ function Remove-FromUserPath {
 
     $resolved = $Dir.TrimEnd('\')
     $current  = [Environment]::GetEnvironmentVariable("Path","User")
-    if (-not $current) { Info "User PATH is empty — nothing to clean."; return }
+    if (-not $current) { Info "User PATH is empty - nothing to clean."; return }
 
     $cmp = [System.StringComparer]::OrdinalIgnoreCase
     $seen    = New-Object 'System.Collections.Generic.HashSet[string]' $cmp
@@ -101,12 +101,12 @@ function Remove-FromUserPath {
 }
 
 # Only remove the bin folder from PATH if it no longer holds anything we care about.
-# (User may have other tools in the same folder — don't yank PATH out from under them.)
+# (User may have other tools in the same folder - don't yank PATH out from under them.)
 $shouldRemove = $true
 if (Test-Path -LiteralPath $BinDir) {
     $remaining = Get-ChildItem -LiteralPath $BinDir -File -ErrorAction SilentlyContinue
     if ($remaining -and $remaining.Count -gt 0) {
-        Warn "Bin folder still contains other files — leaving it on PATH:"
+        Warn "Bin folder still contains other files - leaving it on PATH:"
         $remaining | ForEach-Object { Write-Host "    $($_.Name)" }
         $shouldRemove = $false
     }

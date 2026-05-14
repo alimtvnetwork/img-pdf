@@ -6,7 +6,7 @@
   Full path to jpg2pdf.exe (or jpg2pdf.cmd shim) used by all menu entries.
 
 .NOTES
-  Writes only to HKCU — no admin required.
+  Writes only to HKCU - no admin required.
   Uses MultiSelectModel=Player so multi-select invokes the verb ONCE with
   all selected files as arguments (preserves selection order).
 #>
@@ -238,7 +238,7 @@ function Register-SubItems {
         Add-Item "04_A4_R"      "Convert All to A4 (recursive)"   '--size a4 --recursive "%V"' 4
     }
     elseif ($Mode -eq 'Files') {
-        # MultiSelectModel=Player → %* expands to ALL selected file paths.
+        # MultiSelectModel=Player -> %* expands to ALL selected file paths.
         Add-Item "11_A4"     "Convert Selected to A4"     '--size a4 --files %*'     1
         Add-Item "12_Letter" "Convert Selected to Letter" '--size letter --files %*' 2
         Add-Item "13_Legal"  "Convert Selected to Legal"  '--size legal --files %*'  3
@@ -358,7 +358,7 @@ foreach ($ext in $exts) {
 
     foreach ($root in $targets) {
         Register-ParentV2 $root "Jpg2Pdf.FilesMenu"
-        # MultiSelectModel is set on each LEAF verb inside Build-Submenu —
+        # MultiSelectModel is set on each LEAF verb inside Build-Submenu -
         # setting it here on the parent has no effect when ExtendedSubCommandsKey is used.
     }
 }

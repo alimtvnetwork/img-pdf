@@ -1,8 +1,8 @@
 <#
 .SYNOPSIS
   One-shot bootstrap for jpg2pdf on Windows:
-    pull repo → install Python deps → compile jpg2pdf.exe →
-    add to User PATH → register Explorer context menu.
+    pull repo -> install Python deps -> compile jpg2pdf.exe ->
+    add to User PATH -> register Explorer context menu.
 
 .USAGE
   .\run.ps1
@@ -115,7 +115,7 @@ function Invoke-Logged {
 Info "Log file: $script:LogFile"
 if ($script:VerboseMode) { Info "Verbose mode ON" }
 
-# Capture environment context up front — invaluable when debugging.
+# Capture environment context up front - invaluable when debugging.
 _Log "ENV " ("PSVersion={0} OS={1} User={2} CWD={3}" -f `
     $PSVersionTable.PSVersion, [Environment]::OSVersion.VersionString, $env:USERNAME, (Get-Location).Path)
 
@@ -134,7 +134,7 @@ function Test-RealPython {
 }
 
 function Get-Python {
-    # 1) py launcher (preferred — picks the latest installed real Python).
+    # 1) py launcher (preferred - picks the latest installed real Python).
     $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
     if ($pyLauncher) {
         try {
@@ -387,7 +387,7 @@ if ($NoCompile) {
 
 # When -SelfUpdate is used and nothing changed, skip context-menu re-registration.
 if ($SelfUpdate -and -not $stampChanged -and -not $Force) {
-    Verb "SelfUpdate: no changes — skipping PATH/context-menu steps."
+    Verb "SelfUpdate: no changes - skipping PATH/context-menu steps."
     Info "Already up to date."
     Info "Full session log: $script:LogFile"
     exit 0
@@ -460,7 +460,7 @@ function Update-UserPath {
 # ---------- 7. Register Explorer context menu ----------
 if (-not $NoContextMenu) {
     if (-not (Test-Path $regScript)) {
-        Warn "Missing $regScript — skipping context-menu registration."
+        Warn "Missing $regScript - skipping context-menu registration."
     } else {
         Info "Registering Explorer context menu..."
         Invoke-Logged -Label "register context menu" -FilePath "powershell" `

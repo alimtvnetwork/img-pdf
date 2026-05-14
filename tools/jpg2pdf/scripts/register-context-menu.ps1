@@ -297,14 +297,14 @@ function Build-Submenu {
         # Explorer can still launch legacy per-file verbs on some file classes.
         # Route every invocation through a tiny queueing launcher so only the
         # first process opens a console and runs jpg2pdf once for the full batch.
-        _add "11_A4"        "Convert Selected to A4"                       ($launcher + ' -Size a4 %*')                             -MultiSelect -RawCommand
-        _add "12_Letter"    "Convert Selected to Letter"                   ($launcher + ' -Size letter %*')                         -MultiSelect -RawCommand
-        _add "13_Legal"     "Convert Selected to Legal"                    ($launcher + ' -Size legal %*')                          -MultiSelect -RawCommand
-        _add "15_A4_CW"     "Convert Selected to A4 (rotate 90 CW)"        ($launcher + ' -Size a4 -Rotate 270 %*')                 -MultiSelect -RawCommand
-        _add "16_A4_CCW"    "Convert Selected to A4 (rotate 90 CCW)"       ($launcher + ' -Size a4 -Rotate 90 %*')                  -MultiSelect -RawCommand
-        _add "17_A4_180"    "Convert Selected to A4 (rotate 180)"          ($launcher + ' -Size a4 -Rotate 180 %*')                 -MultiSelect -RawCommand
-        _add "18_A4_NOAR"   "Convert Selected to A4 (no auto-rotate)"      ($launcher + ' -Size a4 -NoAutoRotate %*')               -MultiSelect -RawCommand
-        _add "19_A4_PENCIL" "Convert Selected to A4 (pencil / paper look)" ($launcher + ' -Size a4 -Style pencil %*')               -MultiSelect -RawCommand
+        _add "11_A4"        "Combine into PDF (A4)"                         ($launcher + ' -Size a4 %*')                             -MultiSelect -RawCommand
+        _add "12_Letter"    "Combine into PDF (Letter)"                     ($launcher + ' -Size letter %*')                         -MultiSelect -RawCommand
+        _add "13_Legal"     "Combine into PDF (Legal)"                      ($launcher + ' -Size legal %*')                          -MultiSelect -RawCommand
+        _add "15_A4_CW"     "Combine into PDF (A4, rotate 90 CW)"           ($launcher + ' -Size a4 -Rotate 270 %*')                 -MultiSelect -RawCommand
+        _add "16_A4_CCW"    "Combine into PDF (A4, rotate 90 CCW)"          ($launcher + ' -Size a4 -Rotate 90 %*')                  -MultiSelect -RawCommand
+        _add "17_A4_180"    "Combine into PDF (A4, rotate 180)"             ($launcher + ' -Size a4 -Rotate 180 %*')                 -MultiSelect -RawCommand
+        _add "18_A4_NOAR"   "Combine into PDF (A4, no auto-rotate)"         ($launcher + ' -Size a4 -NoAutoRotate %*')               -MultiSelect -RawCommand
+        _add "19_A4_PENCIL" "Combine into PDF (A4, pencil / paper look)"    ($launcher + ' -Size a4 -Style pencil %*')               -MultiSelect -RawCommand
     }
 }
 

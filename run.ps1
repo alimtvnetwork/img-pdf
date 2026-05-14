@@ -497,12 +497,14 @@ if (-not $NoContextMenu) {
     }
 }
 
-Info "Done! Open a NEW terminal, then try:"
+Show-Footer
+Write-Host "  Try it:" -ForegroundColor Yellow
 Write-Host "    jpg2pdf `"C:\Photos`" --size a4" -ForegroundColor Green
 Write-Host "    jpg2pdf . --size letter --fit cover --out album.pdf" -ForegroundColor Green
 Write-Host "    jpg2pdf . --size legal --orientation landscape --recursive" -ForegroundColor Green
 Write-Host ""
-Info "Right-click a folder, folder background, or selected images:"
-Write-Host "    Images to PDF >  Convert All / Selected to A4 / Letter / Legal" -ForegroundColor Green
+Write-Host "  Right-click a folder, folder background, or selected images:" -ForegroundColor Yellow
+Write-Host "    Images to PDF  >  Convert All / Selected to A4 / Letter / Legal" -ForegroundColor Green
 Write-Host ""
-Info "Full session log: $script:LogFile"
+Write-Host ("  Full session log: {0}" -f $script:LogFile) -ForegroundColor DarkGray
+Write-Host ""

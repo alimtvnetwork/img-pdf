@@ -149,6 +149,13 @@ def main():
                          "(cw = clockwise, default; ccw = counter-clockwise; off)")
     ap.add_argument("--no-auto-rotate", action="store_true",
                     help="Shortcut for --auto-rotate off")
+    ap.add_argument("--style", choices=["none", "pencil"], default="none",
+                    help="Rendering style. 'pencil' = faint pencil-on-paper look "
+                         "(reduced opacity + boosted brightness)")
+    ap.add_argument("--pencil-opacity", type=float, default=0.4,
+                    help="Pencil style: image opacity over white (0..1, default 0.4)")
+    ap.add_argument("--pencil-brightness", type=float, default=1.25,
+                    help="Pencil style: brightness multiplier (default 1.25)")
     args = ap.parse_args()
 
     # ---- Resolve input mode ----

@@ -30,8 +30,8 @@ function Warn($m) { Write-Host "[jpg2pdf] $m" -ForegroundColor Yellow }
 function Die ($m) { Write-Host "[jpg2pdf] $m" -ForegroundColor Red; exit 1 }
 
 if ($env:JPG2PDF_NO_CONTEXT_MENU -eq "1") { $NoContextMenu = $true }
-if ($Repo -eq "alimtvnetwork/img-pdf") {
-    Die "Set the repo: `$env:JPG2PDF_REPO = 'your-user/your-repo'  (or edit install.ps1)."
+if (-not $Repo) {
+    Die "Set the repo: `$env:JPG2PDF_REPO = 'your-user/your-repo'  (or pass -Repo)."
 }
 
 # Resolve tag (latest release if none specified).

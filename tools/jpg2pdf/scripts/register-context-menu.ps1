@@ -18,6 +18,129 @@ param(
 $ErrorActionPreference = "Stop"
 if (-not (Test-Path $ExePath)) { Write-Error "Not found: $ExePath"; exit 1 }
 $exe = (Resolve-Path $ExePath).Path
+$script:SelectedLauncherPath = Join-Path (Split-Path -Parent $exe) "jpg2pdf-selected-launcher.ps1"
+
+function Write-SelectedFilesLauncher {
+    param([Parameter(Mandatory=$true)][string]$Path)
+
+    $content = @'
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory=$true)][string]$ExePath,
+    [Parameter(Mandatory=$true)][ValidateSet("a4","letter","legal")][string]$Size,
+    [string]$Style = "",
+    [int]$Rotate = -1,
+    [switch]$NoAutoRotate,
+    [Parameter(Mandatory=$true, ValueFromRemainingArguments=$true)][string[]]$FilePath
+)
+
+$ErrorActionPreference = "Stop"
+
+function Get-SafeHash([string]$Text) {
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return -join ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($Text)) | ForEach-Object { $_.ToString("x2") })
+    } finally {
+        $sha.Dispose()
+    }
+}
+
+function Quote-CmdArg([string]$Text) {
+    return '"' + ($Text -replace '"','""') + '"'
+}
+
+$paths = @()
+foreach ($raw in $FilePath) {
+    if (-not [string]::IsNullOrWhiteSpace($raw)) {
+        try { $paths += (Resolve-Path -LiteralPath $raw).Path } catch { $paths += $raw }
+    }
+}
+$paths = $paths | Select-Object -Unique
+if (-not $paths -or -not (Test-Path -LiteralPath $ExePath)) { exit 1 }
+
+$firstDir = Split-Path -Parent $paths[0]
+$sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+$keySource = "$sid|$firstDir|$Size|$Style|$Rotate|$([bool]$NoAutoRotate)"
+$key = Get-SafeHash $keySource
+$queueRoot = Join-Path $env:TEMP "jpg2pdf-selected-queue"
+New-Item -ItemType Directory -Force -Path $queueRoot | Out-Null
+
+$stateFile = Join-Path $queueRoot "$key.state"
+$queueFile = Join-Path $queueRoot "$key.queue"
+$mutexName = "Local\jpg2pdf-selected-$key"
+$mutex = New-Object System.Threading.Mutex($false, $mutexName)
+$leader = $false
+
+try {
+    [void]$mutex.WaitOne(10000)
+    $stale = $true
+    if (Test-Path -LiteralPath $stateFile) {
+        $age = (Get-Date) - (Get-Item -LiteralPath $stateFile).LastWriteTime
+        $stale = $age.TotalSeconds -gt 8
+    }
+    if ($stale) {
+        Set-Content -LiteralPath $stateFile -Value ([Diagnostics.Process]::GetCurrentProcess().Id) -Encoding ASCII
+        $leader = $true
+    }
+    Add-Content -LiteralPath $queueFile -Value $paths -Encoding UTF8
+} finally {
+    try { $mutex.ReleaseMutex() } catch {}
+    $mutex.Dispose()
+}
+
+if (-not $leader) { exit 0 }
+
+Start-Sleep -Milliseconds 1400
+
+$mutex = New-Object System.Threading.Mutex($false, $mutexName)
+try {
+    [void]$mutex.WaitOne(10000)
+    $all = @()
+    if (Test-Path -LiteralPath $queueFile) {
+        $all = Get-Content -LiteralPath $queueFile -Encoding UTF8 | Where-Object { $_ } | Select-Object -Unique
+    }
+    Remove-Item -LiteralPath $stateFile,$queueFile -Force -ErrorAction SilentlyContinue
+} finally {
+    try { $mutex.ReleaseMutex() } catch {}
+    $mutex.Dispose()
+}
+
+if (-not $all -or $all.Count -eq 0) { exit 0 }
+
+$listFile = Join-Path $queueRoot ("files-" + $key + "-" + [Guid]::NewGuid().ToString("N") + ".txt")
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[IO.File]::WriteAllLines($listFile, [string[]]$all, $utf8NoBom)
+
+$cmdFile = Join-Path $queueRoot ("run-" + $key + "-" + [Guid]::NewGuid().ToString("N") + ".cmd")
+$args = @("--size", $Size)
+if ($Rotate -ge 0) { $args += @("--rotate", [string]$Rotate) }
+if ($NoAutoRotate) { $args += "--no-auto-rotate" }
+if ($Style) { $args += @("--style", $Style) }
+$args += @("--files-from", $listFile)
+$quotedArgs = ($args | ForEach-Object { Quote-CmdArg ([string]$_) }) -join " "
+
+$cmd = @(
+    "@echo off",
+    "title jpg2pdf selected files",
+    "echo [jpg2pdf] Combining $($all.Count) selected image(s)...",
+    "echo [jpg2pdf] Output will be written next to the first selected image.",
+    ((Quote-CmdArg $ExePath) + " " + $quotedArgs),
+    'set "code=%ERRORLEVEL%"',
+    'if not "%code%"=="0" (',
+    '  echo.',
+    '  echo [jpg2pdf] Failed with exit code %code%.',
+    '  pause',
+    ')',
+    ('del /q ' + (Quote-CmdArg $listFile) + ' >nul 2>nul'),
+    'del /q "%~f0" >nul 2>nul',
+    'exit /b %code%'
+)
+$cmd | Set-Content -LiteralPath $cmdFile -Encoding ASCII
+Start-Process -FilePath $cmdFile -WorkingDirectory $firstDir
+'@
+
+    Set-Content -LiteralPath $Path -Value $content -Encoding UTF8
+}
 
 function New-Key($path) {
     if (-not (Test-Path $path)) { New-Item -Path $path -Force | Out-Null }

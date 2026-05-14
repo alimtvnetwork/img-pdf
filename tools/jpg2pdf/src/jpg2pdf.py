@@ -9,12 +9,14 @@ Two input modes:
 See spec/SPEC.md for the full specification.
 """
 import argparse
+import json
+import os
 import re
 import sys
 from pathlib import Path
 from PIL import Image, ImageChops, ImageEnhance, ImageFilter, ImageOps
 
-__version__ = "0.9.0"
+__version__ = "0.9.1"
 
 # Pencil presets — tuned for faint handwritten text.
 # Module-scope so prompt_pencil_strength() can render the live preview with
@@ -24,6 +26,28 @@ PENCIL_PRESETS = {
     "normal": dict(opacity=0.20, ink_threshold=128, ink_darken=0.32, brightness=1.0),
     "extra":  dict(opacity=0.10, ink_threshold=165, ink_darken=0.12, brightness=1.02),
 }
+
+# ---- Persistent user prefs (last chosen pencil strength, etc.) ----
+# Honors $JPG2PDF_CONFIG_DIR for tests / portable installs.
+CONFIG_DIR  = Path(os.environ.get("JPG2PDF_CONFIG_DIR",
+                                  str(Path.home() / ".jpg2pdf")))
+CONFIG_PATH = CONFIG_DIR / "config.json"
+
+
+def load_prefs() -> dict:
+    try:
+        return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def save_prefs(prefs: dict) -> None:
+    try:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        CONFIG_PATH.write_text(json.dumps(prefs, indent=2), encoding="utf-8")
+    except Exception as e:
+        print(f"  (warning: could not save prefs: {e})", file=sys.stderr)
+
 
 
 def prompt_pencil_strength(default: str = "normal", sample_path=None) -> str:

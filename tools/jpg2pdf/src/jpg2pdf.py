@@ -471,7 +471,17 @@ def main():
     ap.add_argument("--fit",
                     choices=["contain", "cover", "stretch", "original"],
                     default="contain")
-    ap.add_argument("--out", default=None, help="Output PDF path")
+    ap.add_argument("--out", default=None,
+                    help="Explicit output PDF path (overrides --name-pattern)")
+    ap.add_argument("--name-pattern", default=None,
+                    help="Pattern for the auto-generated PDF filename when "
+                         "--out isn't given. Placeholders: "
+                         "{folder} {first} {count} {style} {strength} "
+                         "{date} {time} {datetime} {y} {m} {d} {hh} {mm} {ss}. "
+                         "Examples: '{folder}', '{folder}_{date}', "
+                         "'{folder}-{count}p-{datetime}', "
+                         "'{first}_{strength}'. Saved as your default after "
+                         "each run (in ~/.jpg2pdf/config.json).")
     ap.add_argument("--recursive", action="store_true",
                     help="Folder mode: include subfolders")
     ap.add_argument("--dpi", type=int, default=300,

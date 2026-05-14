@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 PAGE_SIZES = {  # points (1/72 inch)
     "a4":     (595.28, 841.89),

@@ -236,6 +236,136 @@ def prompt_pencil_strength(default: str = "normal", sample_path=None) -> str:
     root.mainloop()
     return result["value"]
 
+
+def prompt_thumbnail_grid(images, thumb_px: int = 140, cols: int = 4):
+    """Show a scrollable Tk grid of thumbnails so the user can confirm /
+    deselect images before the PDF is built.
+
+    Returns: a (filtered, original-order) list of Paths to actually convert,
+    or None if the user cancelled. If Tk or Pillow's ImageTk isn't available,
+    returns the input unchanged so conversion proceeds without an interactive
+    step.
+    """
+    try:
+        import tkinter as tk
+        from tkinter import ttk
+    except Exception:
+        return list(images)
+    try:
+        from PIL import ImageTk
+    except Exception:
+        return list(images)
+    try:
+        root = tk.Tk()
+    except Exception:
+        return list(images)
+
+    root.title(f"jpg2pdf — confirm {len(images)} image(s)")
+    try:
+        root.attributes("-topmost", True)
+    except Exception:
+        pass
+
+    state = {"result": None}
+    vars_ = []  # list of (Path, BooleanVar)
+
+    header = ttk.Frame(root, padding=(12, 10, 12, 6))
+    header.grid(row=0, column=0, sticky="ew")
+    counter = ttk.Label(header, text="")
+    counter.grid(row=0, column=0, sticky="w")
+
+    def _refresh_counter(*_):
+        n = sum(1 for _, v in vars_ if v.get())
+        counter.configure(text=f"{n} of {len(vars_)} selected")
+
+    def _select_all():
+        for _, v in vars_: v.set(True)
+        _refresh_counter()
+
+    def _select_none():
+        for _, v in vars_: v.set(False)
+        _refresh_counter()
+
+    ttk.Button(header, text="All",  command=_select_all ).grid(row=0, column=1, padx=(12, 4))
+    ttk.Button(header, text="None", command=_select_none).grid(row=0, column=2)
+    header.columnconfigure(0, weight=1)
+
+    body = ttk.Frame(root, padding=(8, 4, 8, 4))
+    body.grid(row=1, column=0, sticky="nsew")
+    root.columnconfigure(0, weight=1)
+    root.rowconfigure(1, weight=1)
+
+    rows = max(1, (len(images) + cols - 1) // cols)
+    canvas = tk.Canvas(body, highlightthickness=0,
+                       width=cols * (thumb_px + 24) + 20,
+                       height=min(3, rows) * (thumb_px + 60) + 20)
+    vbar = ttk.Scrollbar(body, orient="vertical", command=canvas.yview)
+    canvas.configure(yscrollcommand=vbar.set)
+    canvas.grid(row=0, column=0, sticky="nsew")
+    vbar.grid(row=0, column=1, sticky="ns")
+    body.columnconfigure(0, weight=1)
+    body.rowconfigure(0, weight=1)
+
+    inner = ttk.Frame(canvas)
+    canvas.create_window((0, 0), window=inner, anchor="nw")
+    inner.bind("<Configure>",
+               lambda _e: canvas.configure(scrollregion=canvas.bbox("all")))
+    canvas.bind_all("<MouseWheel>",
+                    lambda e: canvas.yview_scroll(-1 if e.delta > 0 else 1, "units"))
+
+    photos = []  # keep PhotoImage references alive
+    for idx, p in enumerate(images):
+        cell = ttk.Frame(inner, padding=6, relief="solid", borderwidth=1)
+        cell.grid(row=idx // cols, column=idx % cols, padx=4, pady=4, sticky="n")
+        try:
+            with Image.open(p) as im:
+                im = im.convert("RGB")
+                im.thumbnail((thumb_px, thumb_px), Image.LANCZOS)
+                photo = ImageTk.PhotoImage(im)
+        except Exception:
+            photo = None
+        photos.append(photo)
+        if photo is not None:
+            ttk.Label(cell, image=photo).grid(row=0, column=0)
+        else:
+            ttk.Label(cell, text="(unreadable)", width=18).grid(row=0, column=0)
+        var = tk.BooleanVar(value=True)
+        vars_.append((p, var))
+        name = p.name if len(p.name) <= 22 else p.name[:19] + "…"
+        ttk.Checkbutton(cell, text=name, variable=var,
+                        command=_refresh_counter).grid(row=1, column=0, sticky="w")
+
+    _refresh_counter()
+
+    footer = ttk.Frame(root, padding=(12, 6, 12, 12))
+    footer.grid(row=2, column=0, sticky="ew")
+    footer.columnconfigure(0, weight=1)
+
+    def _ok():
+        state["result"] = [p for p, v in vars_ if v.get()]
+        root.destroy()
+
+    def _cancel():
+        state["result"] = None
+        root.destroy()
+
+    ttk.Button(footer, text="Cancel",  command=_cancel).grid(row=0, column=1, padx=(0, 6))
+    ok_btn = ttk.Button(footer, text="Convert", command=_ok)
+    ok_btn.grid(row=0, column=2)
+    root.bind("<Return>", lambda _e: _ok())
+    root.bind("<Escape>", lambda _e: _cancel())
+    ok_btn.focus_set()
+
+    root.update_idletasks()
+    w = min(root.winfo_reqwidth(),  root.winfo_screenwidth()  - 80)
+    h = min(root.winfo_reqheight(), root.winfo_screenheight() - 120)
+    sw = root.winfo_screenwidth(); sh = root.winfo_screenheight()
+    root.geometry(f"{w}x{h}+{(sw - w) // 2}+{max(20, (sh - h) // 5)}")
+
+    root.mainloop()
+    return state["result"]
+
+
 PAGE_SIZES = {  # points (1/72 inch)
     "a4":     (595.28, 841.89),
     "letter": (612.00, 792.00),

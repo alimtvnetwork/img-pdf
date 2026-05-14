@@ -35,9 +35,9 @@ opening 30 images one-by-one, "Print to PDF", merging, repeat.
 
 ---
 
-## 🚀 Install — one line
+## 🚀 Install
 
-### Windows (PowerShell)
+### 🪟 Windows · PowerShell
 
 ```powershell
 irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
@@ -46,16 +46,57 @@ irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | i
 Drops `jpg2pdf.exe` into `%USERPROFILE%\Tools\bin`, adds it to your **User PATH**,
 and registers the Explorer right-click entries. Open a new terminal afterwards.
 
-### macOS / Linux
+### 🪟 Windows · PowerShell · skip context-menu registration
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1))) -NoContextMenu
+```
+
+### 🪟 Windows · PowerShell · pin a specific version
+
+```powershell
+$env:JPG2PDF_VERSION = "v0.8.0"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
+```
+
+### 🐧 macOS · Linux · Bash
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | bash
 ```
 
 Drops `jpg2pdf` into `~/.local/bin` (override with `JPG2PDF_PREFIX=$HOME/bin`).
 
-> Pin a version with `JPG2PDF_VERSION=v0.8.0`, or skip context-menu registration
-> with `JPG2PDF_NO_CONTEXT_MENU=1`.
+### 🐧 macOS · Linux · Bash · pin a specific version
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh \
+  | JPG2PDF_VERSION=v0.8.0 JPG2PDF_PREFIX=$HOME/bin bash
+```
+
+If PowerShell blocks scripts, use a process-only bypass for the current shell first:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
+```
+
+Or run the installer inside a bypassed PowerShell process:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex"
+```
+
+After installation, open a new terminal and run `jpg2pdf --help`, or right-click any folder in Explorer and pick *Combine images into PDF*.
+
+### 🧹 Uninstall
+
+```powershell
+irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/uninstall.ps1 | iex
+```
+
+> Env var overrides: `JPG2PDF_VERSION` (pin a tag), `JPG2PDF_REPO` (use a fork),
+> `JPG2PDF_NO_CONTEXT_MENU=1` (skip Explorer entries), `JPG2PDF_PREFIX` (custom
+> install dir on macOS / Linux).
 
 ---
 

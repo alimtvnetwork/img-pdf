@@ -70,6 +70,15 @@ jobs:
         run: |
           mv "dist/jpg2pdf${{ matrix.ext }}" "dist/${{ matrix.asset }}"
 
+      # Ad-hoc codesign (no Apple Developer ID required). The binary will run,
+      # but Gatekeeper still quarantines it on first download — users either
+      # right-click → Open, or run: xattr -dr com.apple.quarantine ./jpg2pdf
+      - name: Ad-hoc codesign (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          codesign --force --deep --sign - "dist/${{ matrix.asset }}"
+          codesign --verify --verbose=2 "dist/${{ matrix.asset }}"
+
       - name: Smoke test
         shell: bash
         run: |

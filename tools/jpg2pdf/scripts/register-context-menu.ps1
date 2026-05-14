@@ -333,7 +333,8 @@ Register-ParentV2 "HKCU:\Software\Classes\Directory\shell" "Jpg2Pdf.FolderMenu"
 Register-ParentV2 "HKCU:\Software\Classes\Directory\Background\shell" "Jpg2Pdf.FolderMenu"
 
 # Image file extensions (right-click ON selected images)
-$exts = @(".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff")
+$exts = @(".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff",
+          ".pdf", ".html", ".htm", ".docx", ".doc")
 foreach ($ext in $exts) {
     # Remove older direct file verbs first. If left behind, Explorer may show
     # duplicate entries and run the old per-file command, which opens one

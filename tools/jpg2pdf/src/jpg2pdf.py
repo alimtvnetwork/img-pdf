@@ -312,7 +312,7 @@ def main():
     print(f"Page:     {args.size} {args.orientation} ({int(w)}x{int(h)} pt) @ {args.dpi} DPI")
     print(f"Fit:      {args.fit}  rotate: {args.rotate}  auto-rotate: {auto_rot}")
     if args.style == "pencil":
-        print(f"Style:    pencil [{}] (opacity={args.pencil_opacity}, "
+        print(f"Style:    pencil [{args.pencil_strength}] (opacity={args.pencil_opacity}, "
               f"ink<= {args.pencil_ink_threshold} *{args.pencil_ink_darken}, "
               f"brightness={args.pencil_brightness})")
     print(f"Output:   {out}")

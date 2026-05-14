@@ -5,43 +5,74 @@ cross-platform, with a one-shot Windows installer.
 
 See [`spec/SPEC.md`](spec/SPEC.md) for the full specification.
 
-## Install (Windows, PowerShell)
+## Install — one-liner (prebuilt binaries from GitHub Releases)
+
+Replace `OWNER/REPO` with this repo's GitHub path.
+
+### Windows (PowerShell)
 
 ```powershell
-iwr -useb https://raw.githubusercontent.com/<you>/<repo>/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/OWNER/REPO/main/install.ps1 | iex
 ```
 
-The installer will:
-1. Install Python 3 + Git via `winget` if missing.
-2. Clone this repo into `%USERPROFILE%\Tools\jpg2pdf`.
-3. `pip install` Pillow.
-4. Drop a `jpg2pdf.cmd` shim into `%USERPROFILE%\Tools\bin`.
-5. Add that folder to your **User PATH** so `jpg2pdf` works from anywhere.
+Pin a version, or skip the Explorer context-menu:
 
-Open a new terminal afterwards.
+```powershell
+$env:JPG2PDF_VERSION = "v0.5.0"; irm https://raw.githubusercontent.com/OWNER/REPO/main/install.ps1 | iex
+$env:JPG2PDF_NO_CONTEXT_MENU = "1"; irm https://raw.githubusercontent.com/OWNER/REPO/main/install.ps1 | iex
+```
+
+Drops `jpg2pdf.exe` into `%USERPROFILE%\Tools\bin`, adds it to **User PATH**,
+and registers Explorer right-click entries. Open a new terminal afterwards.
+
+### macOS / Linux (curl)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | sh
+```
+
+Options via env vars:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh \
+  | JPG2PDF_VERSION=v0.5.0 JPG2PDF_PREFIX=$HOME/bin sh
+```
+
+Drops `jpg2pdf` into `$HOME/.local/bin` (override with `JPG2PDF_PREFIX`).
+The script tells you the exact `export PATH=...` line to add if that
+folder isn't on `PATH` yet.
+
+Prebuilt assets published by `.github/workflows/release.yml`:
+`jpg2pdf-windows-x64.exe`, `jpg2pdf-linux-x64`, `jpg2pdf-macos-x64`,
+`jpg2pdf-macos-arm64`, plus `SHA256SUMS.txt`.
 
 ## Use
 
-```powershell
-jpg2pdf "C:\Photos" --size a4
+```bash
+jpg2pdf ~/Pictures --size a4
 jpg2pdf . --size letter --fit cover --out album.pdf
 jpg2pdf . --size legal --orientation landscape --recursive
+jpg2pdf . --size a4 --style pencil           # faint pencil-on-paper look
 ```
 
 Supported inputs: `.jpg .jpeg .png .webp .bmp .tif .tiff` (sorted naturally).
 
-## Without installing globally
-
-```powershell
-.\scripts\run.ps1 "C:\Photos" -a4
-```
-
-## macOS / Linux
+## Build from source
 
 ```bash
-pip install -r requirements.txt
-python src/jpg2pdf.py ./photos --size a4
+pip install -r tools/jpg2pdf/requirements.txt
+python tools/jpg2pdf/src/jpg2pdf.py ./photos --size a4
 ```
+
+## Cutting a release
+
+Tag and push — the workflow builds binaries for Windows / Linux / macOS
+(both x64 and Apple Silicon) and publishes a GitHub Release:
+
+```bash
+git tag v0.5.0 && git push origin v0.5.0
+```
+
 
 ## Repo layout
 

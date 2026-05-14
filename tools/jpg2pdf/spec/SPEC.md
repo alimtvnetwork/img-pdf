@@ -1,13 +1,14 @@
 # jpg2pdf — Specification
 
 ## Goal
-Command-line tool that combines images in a folder (or a selected list of
-image files) into a single PDF. One-shot Windows install with global PATH
-binary and **Explorer context-menu** integration.
+Command-line tool that combines a folder (or a selected list of files) into a
+single PDF. Accepts images, existing PDFs, HTML pages, and Word documents in
+any mix and merges them in the given order. One-shot Windows install with a
+global PATH binary and **Explorer context-menu** integration.
 
 ## Non-goals
-- No OCR, compression, or image editing.
-- No GUI (context menu only).
+- No OCR or image editing.
+- No GUI (context menu + small Tk dialogs only).
 
 ## Supported platforms
 - Windows 10/11 (primary; `run.ps1` bootstraps everything).
@@ -15,16 +16,28 @@ binary and **Explorer context-menu** integration.
 
 ## Inputs
 Either:
-- **A folder path** → every supported image inside it (optionally recursive).
+- **A folder path** → every supported file inside it (optionally recursive).
 - **A list of file paths** → exact files in the order given (used by the
-  "Selected convert" context-menu entries; the registry uses
+  "Combine into PDF" context-menu entries; the registry uses
   `MultiSelectModel=Player` so all selected files are passed in one call,
   preserving selection order).
 
 Supported extensions (case-insensitive):
-`.jpg .jpeg .png .webp .bmp .tif .tiff`
 
-Folder input is sorted naturally (`img2.jpg` before `img10.jpg`).
+| Kind   | Extensions                                       | Renderer |
+|--------|--------------------------------------------------|----------|
+| Image  | `.jpg .jpeg .png .webp .bmp .tif .tiff`          | Pillow (existing pipeline; honours `--size/--fit/--style/...`) |
+| PDF    | `.pdf`                                           | embedded as-is, page geometry preserved |
+| HTML   | `.html .htm`                                     | `xhtml2pdf` (pure Python) |
+| Word   | `.docx .doc`                                     | `docx2pdf` (needs MS Word on Windows or LibreOffice on macOS) |
+
+Folder input is sorted naturally (`img2.jpg` before `img10.jpg`). Mixed
+selections are merged into a single PDF in selection order; consecutive
+images are batched into one image-PDF chunk for efficiency.
+
+`--size`, `--fit`, `--orientation`, `--dpi`, `--rotate`, `--auto-rotate`, and
+`--style pencil` apply ONLY to image inputs. PDFs / HTML / Word keep their
+own page geometry.
 
 ## CLI
 ```

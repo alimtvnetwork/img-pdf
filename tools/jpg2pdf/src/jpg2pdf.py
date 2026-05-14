@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 from PIL import Image, ImageChops, ImageEnhance, ImageFilter, ImageOps
 
-__version__ = "0.11.3"
+__version__ = "0.12.0"
 
 # Pencil presets — tuned for faint handwritten text.
 # Module-scope so prompt_pencil_strength() can render the live preview with
@@ -371,7 +371,23 @@ PAGE_SIZES = {  # points (1/72 inch)
     "letter": (612.00, 792.00),
     "legal":  (612.00, 1008.00),
 }
-EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
+IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
+PDF_EXTS   = {".pdf"}
+HTML_EXTS  = {".html", ".htm"}
+WORD_EXTS  = {".docx", ".doc"}
+SUPPORTED_EXTS = IMAGE_EXTS | PDF_EXTS | HTML_EXTS | WORD_EXTS
+# Backwards-compat alias (some older callers / tests imported EXTS).
+EXTS = IMAGE_EXTS
+
+
+def kind_of(p: Path) -> str:
+    """Classify an input path: 'image' | 'pdf' | 'html' | 'word' | 'unknown'."""
+    ext = p.suffix.lower()
+    if ext in IMAGE_EXTS: return "image"
+    if ext in PDF_EXTS:   return "pdf"
+    if ext in HTML_EXTS:  return "html"
+    if ext in WORD_EXTS:  return "word"
+    return "unknown"
 
 
 def natural_key(p: Path):
@@ -381,22 +397,99 @@ def natural_key(p: Path):
 
 def collect_from_folder(folder: Path, recursive: bool):
     it = folder.rglob("*") if recursive else folder.iterdir()
-    files = [p for p in it if p.is_file() and p.suffix.lower() in EXTS]
+    files = [p for p in it if p.is_file() and p.suffix.lower() in SUPPORTED_EXTS]
     files.sort(key=natural_key)
     return files
 
 
 def collect_from_list(paths):
-    """Preserve given order. Skip non-image / missing files with a warning."""
+    """Preserve given order. Skip unsupported / missing files with a warning."""
     out = []
     for raw in paths:
         p = Path(raw).expanduser().resolve()
         if not p.is_file():
             print(f"  skip (not a file): {p}", file=sys.stderr); continue
-        if p.suffix.lower() not in EXTS:
+        if p.suffix.lower() not in SUPPORTED_EXTS:
             print(f"  skip (unsupported): {p}", file=sys.stderr); continue
         out.append(p)
     return out
+
+
+# ---------- Per-type → PDF converters ----------
+# Each returns a Path to a PDF file (either a freshly-written temp file or
+# the original input for already-PDF inputs). They never raise on missing
+# optional deps — they print a warning and return None so the caller can skip.
+
+def html_to_pdf(src: Path, out_pdf: Path) -> Path | None:
+    try:
+        from xhtml2pdf import pisa  # type: ignore
+    except Exception as e:
+        print(f"  skip {src.name}: HTML support needs xhtml2pdf ({e})",
+              file=sys.stderr)
+        return None
+    try:
+        html = src.read_text(encoding="utf-8", errors="replace")
+    except Exception as e:
+        print(f"  skip {src.name}: cannot read HTML ({e})", file=sys.stderr)
+        return None
+    with open(out_pdf, "wb") as f:
+        result = pisa.CreatePDF(src=html, dest=f, encoding="utf-8")
+    if result.err:
+        print(f"  skip {src.name}: HTML→PDF failed ({result.err} error(s))",
+              file=sys.stderr)
+        return None
+    return out_pdf
+
+
+def word_to_pdf(src: Path, out_pdf: Path) -> Path | None:
+    try:
+        from docx2pdf import convert as _docx_convert  # type: ignore
+    except Exception as e:
+        print(f"  skip {src.name}: Word support needs docx2pdf ({e})",
+              file=sys.stderr)
+        return None
+    try:
+        # docx2pdf needs a real installed Word (Win) / LibreOffice (mac).
+        _docx_convert(str(src), str(out_pdf))
+    except Exception as e:
+        print(f"  skip {src.name}: Word→PDF failed ({e}). "
+              "Install Microsoft Word (Windows) or LibreOffice.",
+              file=sys.stderr)
+        return None
+    if not out_pdf.is_file():
+        print(f"  skip {src.name}: Word→PDF produced no output", file=sys.stderr)
+        return None
+    return out_pdf
+
+
+def images_to_pdf_chunk(image_paths, out_pdf: Path, *, page_w_pt, page_h_pt,
+                        fit, dpi, auto_rotate, rotate, style,
+                        pencil_opacity, pencil_brightness,
+                        pencil_ink_threshold, pencil_ink_darken) -> Path | None:
+    pages = []
+    for p in image_paths:
+        pages.append(make_page(p, page_w_pt, page_h_pt, fit, dpi,
+                               auto_rotate=auto_rotate, rotate=rotate,
+                               style=style,
+                               pencil_opacity=pencil_opacity,
+                               pencil_brightness=pencil_brightness,
+                               pencil_ink_threshold=pencil_ink_threshold,
+                               pencil_ink_darken=pencil_ink_darken))
+    if not pages:
+        return None
+    pages[0].save(out_pdf, "PDF", resolution=float(dpi),
+                  save_all=True, append_images=pages[1:])
+    return out_pdf
+
+
+def merge_pdfs(pdf_paths, out: Path) -> None:
+    from pypdf import PdfWriter  # local import — heavy dep
+    writer = PdfWriter()
+    for p in pdf_paths:
+        writer.append(str(p))
+    with open(out, "wb") as f:
+        writer.write(f)
+    writer.close()
 
 
 def apply_pencil(im: Image.Image, opacity: float, brightness: float,

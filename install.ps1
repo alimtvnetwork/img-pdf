@@ -283,6 +283,7 @@ function Convert-SafeJson($Description, $Raw) {
         Info "Installing jpg2pdf $Version"
         if (Download-ReleaseAsset $Repo $Version $asset $exePath) { $installedFrom = "release $Version" }
         if (-not $installedFrom) {
+            Add-CrashReport "release asset:$asset" "version-pinned install" "latest main-branch artifact" "release asset unavailable"
             Warn "Release asset was not available. Falling back to the latest successful main-branch artifact."
             if (Download-MainArtifact $Repo $asset $exePath) {
                 $installedFrom = "latest main-branch artifact"
@@ -296,6 +297,7 @@ function Convert-SafeJson($Description, $Raw) {
             $Version = $rel.tag_name
             Info "Installing jpg2pdf $Version"
             if (Download-ReleaseAsset $Repo $Version $asset $exePath) { $installedFrom = "release $Version" }
+            if (-not $installedFrom) { Add-CrashReport "release asset:$asset" "latest-release install" "latest main-branch artifact" "release asset unavailable" }
         } else {
             Add-CrashReport "latest release" "release resolution" "latest main-branch artifact" "no GitHub Release found"
             Warn "No GitHub Release found. Falling back to the latest successful main-branch artifact."

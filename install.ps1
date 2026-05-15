@@ -38,11 +38,26 @@ try {
     $InstallerArgs = @()
     try { if ($null -ne $args) { $InstallerArgs = @($args) } } catch { $InstallerArgs = @() }
 
+    $script:CrashReports = @()
+    $script:CrashReportWritten = $false
+
+    function Add-CrashReport($Variable, $Where, $Fallback, $ErrorText) {
+        try {
+            $script:CrashReports += [pscustomobject]@{
+                Time = (Get-Date -Format 'HH:mm:ss')
+                Variable = [string]$Variable
+                Where = [string]$Where
+                Fallback = [string]$Fallback
+                Error = [string]$ErrorText
+            }
+        } catch { }
+    }
+
     function Get-SafeEnv($Name, $Default = "") {
         try {
             $value = [Environment]::GetEnvironmentVariable($Name)
             if ($null -ne $value -and [string]$value -ne "") { return [string]$value }
-        } catch { }
+        } catch { Add-CrashReport "env:$Name" "Get-SafeEnv" "default: $Default" $_ }
         return $Default
     }
 
@@ -74,6 +89,7 @@ try {
         }
     } catch {
         try { Write-Host "[jpg2pdf] Argument parsing failed safely: $_" -ForegroundColor Yellow } catch { }
+        Add-CrashReport "InstallerArgs" "argument parsing" "ignore invalid installer option" $_
     }
 
 
@@ -98,10 +114,28 @@ function Write-Log($Level, $Message) {
         try { Add-Content -LiteralPath $script:LogFile -Value ("{0} {1} {2}" -f (Get-Date -Format 'HH:mm:ss'), $Level, $Message) -ErrorAction SilentlyContinue } catch { }
     }
 }
+function Write-CrashReportSection($Reason) {
+    if (-not $script:LogFile -or $script:CrashReportWritten) { return }
+    try {
+        $script:CrashReportWritten = $true
+        Add-Content -LiteralPath $script:LogFile -Value "" -ErrorAction SilentlyContinue
+        Add-Content -LiteralPath $script:LogFile -Value "===== Installer crash report =====" -ErrorAction SilentlyContinue
+        Add-Content -LiteralPath $script:LogFile -Value ("Reason: {0}" -f $Reason) -ErrorAction SilentlyContinue
+        if ($script:CrashReports -and $script:CrashReports.Count -gt 0) {
+            foreach ($item in $script:CrashReports) {
+                Add-Content -LiteralPath $script:LogFile -Value ("{0} variable={1} where={2} fallback={3} error={4}" -f $item.Time, $item.Variable, $item.Where, $item.Fallback, $item.Error) -ErrorAction SilentlyContinue
+            }
+        } else {
+            Add-Content -LiteralPath $script:LogFile -Value "No guarded read failures were recorded before exit." -ErrorAction SilentlyContinue
+        }
+        Add-Content -LiteralPath $script:LogFile -Value "===== End installer crash report =====" -ErrorAction SilentlyContinue
+    } catch { }
+}
 function Info($m)  { Write-Log "INFO " $m; Write-Host "[jpg2pdf] $m" -ForegroundColor Cyan }
 function Warn($m)  { Write-Log "WARN " $m; Write-Host "[jpg2pdf] $m" -ForegroundColor Yellow }
 function Debug2($m){ Write-Log "DEBUG" $m; if ($script:DebugMode) { Write-Host "[jpg2pdf:debug] $m" -ForegroundColor Magenta } }
 function Die ($m)  {
+    Write-CrashReportSection $m
     Write-Log "ERROR" $m
     Write-Host "[jpg2pdf] $m" -ForegroundColor Red
     if ($script:LogFile) { Write-Host "[jpg2pdf] Full log: $script:LogFile" -ForegroundColor Red }
@@ -109,20 +143,20 @@ function Die ($m)  {
 }
 
 function Invoke-Safe($Description, [scriptblock]$Action, $Default = $null) {
-    try { return & $Action } catch { Warn "$Description failed safely: $_"; return $Default }
+    try { return & $Action } catch { Add-CrashReport $Description $Description "default: $Default" $_; Warn "$Description failed safely: $_"; return $Default }
 }
 function Invoke-SafeBool($Description, [scriptblock]$Action) {
-    try { $null = & $Action; return $true } catch { Warn "$Description failed safely: $_"; return $false }
+    try { $null = & $Action; return $true } catch { Add-CrashReport $Description $Description "false" $_; Warn "$Description failed safely: $_"; return $false }
 }
 function Join-SafePath($Base, $Child) {
-    try { if ($Base) { return (Join-Path $Base $Child -ErrorAction Stop) } } catch { Warn "Path join failed safely: $_" }
+    try { if ($Base) { return (Join-Path $Base $Child -ErrorAction Stop) } } catch { Add-CrashReport "path:$Base + $Child" "Join-SafePath" "child only: $Child" $_; Warn "Path join failed safely: $_" }
     return $Child
 }
 function Test-SafePath($Path) {
-    try { return (Test-Path -LiteralPath $Path -ErrorAction Stop) } catch { Warn "Path test failed safely: $_"; return $false }
+    try { return (Test-Path -LiteralPath $Path -ErrorAction Stop) } catch { Add-CrashReport "path:$Path" "Test-SafePath" "false" $_; Warn "Path test failed safely: $_"; return $false }
 }
 function Resolve-SafePath($Path) {
-    try { return (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path } catch { Warn "Path resolve failed safely: $_"; return $Path }
+    try { return (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path } catch { Add-CrashReport "path:$Path" "Resolve-SafePath" "original path" $_; Warn "Path resolve failed safely: $_"; return $Path }
 }
 function Save-SafeUrl($Description, $Uri, $OutFile) {
     Debug2 "GET $Uri ($Description)"
@@ -133,6 +167,7 @@ function Convert-SafeJson($Description, $Raw) {
         if (-not $Raw) { return $null }
         return ($Raw | ConvertFrom-Json -ErrorAction Stop)
     } catch {
+        Add-CrashReport $Description "Convert-SafeJson" "null" $_
         Warn "$Description JSON parse failed safely: $_"
         return $null
     }
@@ -162,6 +197,7 @@ function Convert-SafeJson($Description, $Raw) {
         $response = Invoke-Safe "$Description HTTP read" { Invoke-WebRequest -Headers $headers -Uri $Uri -UseBasicParsing -ErrorAction Stop } $null
         if (-not $response) { return $null }
         $content = Invoke-Safe "$Description response content read" { [string]$response.Content } ""
+        if (-not $content) { Add-CrashReport "response.Content" $Description "null JSON result" "empty response content" }
         return Convert-SafeJson $Description $content
     }
 
@@ -185,13 +221,22 @@ function Convert-SafeJson($Description, $Raw) {
         Info "Looking for latest main-branch artifact named $Asset ..."
         $runsUrl = "https://api.github.com/repos/$Repo/actions/workflows/release.yml/runs?branch=main&status=success&per_page=10"
         $runs = Get-GitHubJson $runsUrl "Main-branch workflow lookup"
-        if (-not $runs -or -not $runs.workflow_runs) { return $false }
+        if (-not $runs -or -not $runs.workflow_runs) {
+            Add-CrashReport "workflow_runs" "Download-MainArtifact" "artifact fallback unavailable" "no successful main-branch runs returned"
+            return $false
+        }
 
         foreach ($run in $runs.workflow_runs) {
             $artifacts = Get-GitHubJson $run.artifacts_url "Artifact lookup for run $($run.id)"
-            if (-not $artifacts -or -not $artifacts.artifacts) { continue }
+            if (-not $artifacts -or -not $artifacts.artifacts) {
+                Add-CrashReport "artifacts" "Download-MainArtifact run $($run.id)" "try next workflow run" "no artifacts returned"
+                continue
+            }
             $artifact = $artifacts.artifacts | Where-Object { $_.name -eq $Asset -and -not $_.expired } | Select-Object -First 1
-            if (-not $artifact) { continue }
+            if (-not $artifact) {
+                Add-CrashReport "artifact:$Asset" "Download-MainArtifact run $($run.id)" "try next workflow run" "artifact missing or expired"
+                continue
+            }
 
             $tmpRoot = $null
             try {
@@ -238,6 +283,7 @@ function Convert-SafeJson($Description, $Raw) {
         Info "Installing jpg2pdf $Version"
         if (Download-ReleaseAsset $Repo $Version $asset $exePath) { $installedFrom = "release $Version" }
         if (-not $installedFrom) {
+            Add-CrashReport "release asset:$asset" "version-pinned install" "latest main-branch artifact" "release asset unavailable"
             Warn "Release asset was not available. Falling back to the latest successful main-branch artifact."
             if (Download-MainArtifact $Repo $asset $exePath) {
                 $installedFrom = "latest main-branch artifact"
@@ -251,7 +297,9 @@ function Convert-SafeJson($Description, $Raw) {
             $Version = $rel.tag_name
             Info "Installing jpg2pdf $Version"
             if (Download-ReleaseAsset $Repo $Version $asset $exePath) { $installedFrom = "release $Version" }
+            if (-not $installedFrom) { Add-CrashReport "release asset:$asset" "latest-release install" "latest main-branch artifact" "release asset unavailable" }
         } else {
+            Add-CrashReport "latest release" "release resolution" "latest main-branch artifact" "no GitHub Release found"
             Warn "No GitHub Release found. Falling back to the latest successful main-branch artifact."
         }
 
@@ -307,8 +355,10 @@ function Convert-SafeJson($Description, $Raw) {
     }
 
     Info "Done. Open a NEW terminal and try:"
+    Write-CrashReportSection "installer completed"
     Write-Host "    jpg2pdf `"C:\Photos`" --size a4" -ForegroundColor Green
     Write-Host "    jpg2pdf . --size a4 --style pencil" -ForegroundColor Green
 } catch {
+    try { Write-CrashReportSection "top-level catch: $_" } catch { }
     try { Die "Installer failed safely: $_" } catch { Stop-Safely "Installer failed safely before logging was initialized: $_" }
 }

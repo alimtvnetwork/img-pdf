@@ -197,6 +197,7 @@ function Convert-SafeJson($Description, $Raw) {
         $response = Invoke-Safe "$Description HTTP read" { Invoke-WebRequest -Headers $headers -Uri $Uri -UseBasicParsing -ErrorAction Stop } $null
         if (-not $response) { return $null }
         $content = Invoke-Safe "$Description response content read" { [string]$response.Content } ""
+        if (-not $content) { Add-CrashReport "response.Content" $Description "null JSON result" "empty response content" }
         return Convert-SafeJson $Description $content
     }
 
@@ -220,13 +221,22 @@ function Convert-SafeJson($Description, $Raw) {
         Info "Looking for latest main-branch artifact named $Asset ..."
         $runsUrl = "https://api.github.com/repos/$Repo/actions/workflows/release.yml/runs?branch=main&status=success&per_page=10"
         $runs = Get-GitHubJson $runsUrl "Main-branch workflow lookup"
-        if (-not $runs -or -not $runs.workflow_runs) { return $false }
+        if (-not $runs -or -not $runs.workflow_runs) {
+            Add-CrashReport "workflow_runs" "Download-MainArtifact" "artifact fallback unavailable" "no successful main-branch runs returned"
+            return $false
+        }
 
         foreach ($run in $runs.workflow_runs) {
             $artifacts = Get-GitHubJson $run.artifacts_url "Artifact lookup for run $($run.id)"
-            if (-not $artifacts -or -not $artifacts.artifacts) { continue }
+            if (-not $artifacts -or -not $artifacts.artifacts) {
+                Add-CrashReport "artifacts" "Download-MainArtifact run $($run.id)" "try next workflow run" "no artifacts returned"
+                continue
+            }
             $artifact = $artifacts.artifacts | Where-Object { $_.name -eq $Asset -and -not $_.expired } | Select-Object -First 1
-            if (-not $artifact) { continue }
+            if (-not $artifact) {
+                Add-CrashReport "artifact:$Asset" "Download-MainArtifact run $($run.id)" "try next workflow run" "artifact missing or expired"
+                continue
+            }
 
             $tmpRoot = $null
             try {

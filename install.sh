@@ -195,7 +195,8 @@ download_main_artifact() {
     archive_url="$(printf '%s' "$artifact_line" | json_value archive_download_url)"
     [ -n "$archive_url" ] || continue
 
-    tmp_root="${TMPDIR:-/tmp}/jpg2pdf-artifact-$$"
+    tmp_base="${TMPDIR:-/tmp}"
+    tmp_root="$tmp_base/jpg2pdf-artifact-$$"
     zip_file="$tmp_root/artifact.zip"
     extract_dir="$tmp_root/unzipped"
     rm -rf "$tmp_root"

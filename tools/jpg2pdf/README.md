@@ -18,7 +18,7 @@ irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | i
 Pin a version, or skip the Explorer context-menu:
 
 ```powershell
-$env:JPG2PDF_VERSION = "v1.2.9"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
+$env:JPG2PDF_VERSION = "v1.3.0"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 $env:JPG2PDF_NO_CONTEXT_MENU = "1"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 ```
 
@@ -35,7 +35,7 @@ Options via env vars:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh \
-  | JPG2PDF_VERSION=v1.2.9 JPG2PDF_PREFIX=$HOME/bin sh
+  | JPG2PDF_VERSION=v1.3.0 JPG2PDF_PREFIX=$HOME/bin sh
 ```
 
 Drops `jpg2pdf` into `$HOME/.local/bin` (override with `JPG2PDF_PREFIX`).
@@ -87,7 +87,7 @@ Tag and push — the workflow builds binaries for Windows / Linux / macOS
 (both x64 and Apple Silicon) and publishes a GitHub Release:
 
 ```bash
-git tag v1.2.9 && git push origin v1.2.9
+git tag v1.3.0 && git push origin v1.3.0
 ```
 
 

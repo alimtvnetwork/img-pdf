@@ -4,6 +4,16 @@ All notable changes to `jpg2pdf` are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-05-15
+
+### Fixed
+- Windows installer: hardened the very early bootstrap so a hostile host cannot crash the shell before logging is initialized. `$ErrorActionPreference`, the global `trap`, `Stop-Safely`/`Die` lookup, `$args` access, the argument parser loop, and the TLS 1.2 enable call are now each wrapped in their own `try/catch` (or guarded with `Get-Command Die`).
+- Argument parsing now reads from a defensive `$InstallerArgs` copy of `$args` so `irm | iex` hosts that do not expose `$args` cannot fault on `.Count`.
+- Verified: when no GitHub Release (or no matching asset) is available, both installers continue to fall back to the latest successful `main`-branch workflow artifact.
+
+### Changed
+- Pinned-version install snippets in `README.md`, `tools/jpg2pdf/README.md`, `install.ps1`, and `install.sh` now reference `v1.3.0`.
+
 ## [1.2.9] - 2026-05-15
 
 ### Fixed

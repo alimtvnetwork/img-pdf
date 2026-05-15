@@ -6,7 +6,7 @@
   irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 
   # Pin a specific version:
-  $env:JPG2PDF_VERSION = "v1.2.9"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
+  $env:JPG2PDF_VERSION = "v1.3.0"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 
   # Skip Explorer context-menu registration:
   $env:JPG2PDF_NO_CONTEXT_MENU = "1"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
@@ -18,18 +18,26 @@
   4. Adds that folder to your User PATH (persistent, no admin).
   5. Downloads + runs register-context-menu.ps1 from the same tag or main (unless disabled).
 #>
-$ErrorActionPreference = "Stop"
+try { $ErrorActionPreference = "Stop" } catch { }
 
 function Stop-Safely($Message) {
     try { Write-Host "[jpg2pdf] $Message" -ForegroundColor Red } catch { }
-    exit 1
+    try { exit 1 } catch { return }
 }
 
 trap {
-    try { Die "Installer failed safely before completion: $_" } catch { Stop-Safely "Installer failed safely before initialization: $_" }
+    try {
+        if (Get-Command Die -ErrorAction SilentlyContinue) { Die "Installer failed safely before completion: $_" }
+        else { Stop-Safely "Installer failed safely before initialization: $_" }
+    } catch { Stop-Safely "Installer failed safely (trap): $_" }
+    continue
 }
 
 try {
+    # Guard $args access -- under `irm | iex` it may be $null in some hosts.
+    $InstallerArgs = @()
+    try { if ($null -ne $args) { $InstallerArgs = @($args) } } catch { $InstallerArgs = @() }
+
     function Get-SafeEnv($Name, $Default = "") {
         try {
             $value = [Environment]::GetEnvironmentVariable($Name)
@@ -43,26 +51,31 @@ try {
     $NoContextMenu = $false
     $DebugLog = $false
 
-    for ($i = 0; $i -lt $args.Count; $i++) {
-        $arg = [string]$args[$i]
-        switch -Regex ($arg) {
-            '^(--repo|-Repo)$' {
-                $i++
-                if ($i -ge $args.Count) { throw "Missing value for $arg" }
-                $Repo = [string]$args[$i]
-                continue
+    try {
+        for ($i = 0; $i -lt $InstallerArgs.Count; $i++) {
+            $arg = [string]$InstallerArgs[$i]
+            switch -Regex ($arg) {
+                '^(--repo|-Repo)$' {
+                    $i++
+                    if ($i -ge $InstallerArgs.Count) { throw "Missing value for $arg" }
+                    $Repo = [string]$InstallerArgs[$i]
+                    continue
+                }
+                '^(--version|-Version)$' {
+                    $i++
+                    if ($i -ge $InstallerArgs.Count) { throw "Missing value for $arg" }
+                    $Version = [string]$InstallerArgs[$i]
+                    continue
+                }
+                '^(--no-context-menu|-NoContextMenu)$' { $NoContextMenu = $true; continue }
+                '^(--debug|--verbose|-DebugLog|-Verbose|-Verbose2|-d|-v)$' { $DebugLog = $true; continue }
+                default { throw "Unknown installer option: $arg" }
             }
-            '^(--version|-Version)$' {
-                $i++
-                if ($i -ge $args.Count) { throw "Missing value for $arg" }
-                $Version = [string]$args[$i]
-                continue
-            }
-            '^(--no-context-menu|-NoContextMenu)$' { $NoContextMenu = $true; continue }
-            '^(--debug|--verbose|-DebugLog|-Verbose|-Verbose2|-d|-v)$' { $DebugLog = $true; continue }
-            default { throw "Unknown installer option: $arg" }
         }
+    } catch {
+        try { Write-Host "[jpg2pdf] Argument parsing failed safely: $_" -ForegroundColor Yellow } catch { }
     }
+
 
 $script:DebugMode = $false
 if ($DebugLog) { $script:DebugMode = $true }
@@ -130,7 +143,7 @@ function Save-SafeUrl($Description, $Uri, $OutFile) {
         Debug2 "USERPROFILE=$(Get-SafeEnv 'USERPROFILE')  TEMP=$(Get-SafeEnv 'TEMP')"
     }
 
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { Warn "Could not force TLS 1.2 safely: $_" }
     $headers = @{ "User-Agent" = "jpg2pdf-installer"; "Accept" = "application/vnd.github+json" }
     $token = Get-SafeEnv "GITHUB_TOKEN"
     if ($token) { $headers["Authorization"] = "Bearer $token" }

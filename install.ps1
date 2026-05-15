@@ -6,7 +6,7 @@
   irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 
   # Pin a specific version:
-  $env:JPG2PDF_VERSION = "v1.2.7"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
+  $env:JPG2PDF_VERSION = "v1.2.8"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 
   # Skip Explorer context-menu registration:
   $env:JPG2PDF_NO_CONTEXT_MENU = "1"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
@@ -30,6 +30,14 @@ trap {
 }
 
 try {
+    function Get-SafeEnv($Name, $Default = "") {
+        try {
+            $value = [Environment]::GetEnvironmentVariable($Name)
+            if ($null -ne $value -and [string]$value -ne "") { return [string]$value }
+        } catch { }
+        return $Default
+    }
+
     $Repo = $null
     $Version = $null
     $NoContextMenu = $false
@@ -58,12 +66,14 @@ try {
 
 $script:DebugMode = $false
 if ($DebugLog) { $script:DebugMode = $true }
-if ($env:JPG2PDF_DEBUG -eq "1") { $script:DebugMode = $true }
+if ((Get-SafeEnv "JPG2PDF_DEBUG") -eq "1") { $script:DebugMode = $true }
 
 $script:LogFile = $null
 try {
-    $logBase = if ($env:JPG2PDF_LOG) { $env:JPG2PDF_LOG } else {
-        $tmp = if ($env:TEMP) { $env:TEMP } else { [System.IO.Path]::GetTempPath() }
+    $configuredLog = Get-SafeEnv "JPG2PDF_LOG"
+    $logBase = if ($configuredLog) { $configuredLog } else {
+        $tmp = Get-SafeEnv "TEMP"
+        if (-not $tmp) { $tmp = [System.IO.Path]::GetTempPath() }
         Join-Path $tmp ("jpg2pdf-install-{0}-{1}.log" -f (Get-Date -Format 'yyyyMMdd-HHmmss'), $PID)
     }
     New-Item -ItemType File -Force -Path $logBase | Out-Null

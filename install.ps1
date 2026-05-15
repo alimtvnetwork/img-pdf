@@ -202,9 +202,11 @@ function Save-SafeUrl($Description, $Uri, $OutFile) {
     $homeDir = Get-SafeEnv "USERPROFILE"
     if (-not $homeDir) { try { if ($HOME) { $homeDir = [string]$HOME } } catch { } }
     if (-not $homeDir) { try { $homeDir = (Get-Location).Path } catch { $homeDir = "." } }
-    $binDir  = Join-Path $homeDir "Tools\bin"
-    $exePath = Join-Path $binDir "jpg2pdf.exe"
-    New-Item -ItemType Directory -Force -Path $binDir | Out-Null
+    $binDir  = Join-SafePath $homeDir "Tools\bin"
+    $exePath = Join-SafePath $binDir "jpg2pdf.exe"
+    if (-not (Invoke-SafeBool "Install directory creation" { New-Item -ItemType Directory -Force -Path $binDir -ErrorAction Stop | Out-Null })) {
+        Die "Could not create install directory safely."
+    }
 
     $installedFrom = $null
     if ($Version) {
@@ -250,7 +252,7 @@ function Save-SafeUrl($Description, $Uri, $OutFile) {
         $current = [Environment]::GetEnvironmentVariable("Path", "User")
         if (-not $current) { $current = "" }
         $entries = $current.Split(';') | ForEach-Object { $_.Trim().TrimEnd('\') } | Where-Object { $_ }
-        $resolved = (Resolve-Path $binDir).Path.TrimEnd('\')
+        $resolved = (Resolve-SafePath $binDir).TrimEnd('\')
         if ($entries -notcontains $resolved) {
             [Environment]::SetEnvironmentVariable("Path", (($entries + $resolved) -join ';'), "User")
             Info "Added $resolved to User PATH (open a new terminal to pick it up)."
@@ -268,11 +270,12 @@ function Save-SafeUrl($Description, $Uri, $OutFile) {
     if (-not $NoContextMenu) {
         $ctxRef = $(if ($Version) { $Version } else { "main" })
         $ctxUrl  = "https://raw.githubusercontent.com/$Repo/$ctxRef/tools/jpg2pdf/scripts/register-context-menu.ps1"
-        $ctxFile = Join-Path (Get-SafeTempDir) "jpg2pdf-register-context-menu.ps1"
+        $ctxFile = Join-SafePath (Get-SafeTempDir) "jpg2pdf-register-context-menu.ps1"
         try {
             Info "Fetching context-menu registrar from $ctxUrl"
-            Invoke-WebRequest -Headers $headers -Uri $ctxUrl -OutFile $ctxFile -UseBasicParsing
-            & powershell -NoProfile -ExecutionPolicy Bypass -File $ctxFile -ExePath $exePath
+            if (Save-SafeUrl "Context-menu registrar download" $ctxUrl $ctxFile) {
+                $null = Invoke-Safe "Context-menu registrar execution" { & powershell -NoProfile -ExecutionPolicy Bypass -File $ctxFile -ExePath $exePath } $null
+            }
         } catch {
             Warn "Skipped context-menu registration: $_"
         }

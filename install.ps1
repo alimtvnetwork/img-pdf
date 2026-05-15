@@ -18,15 +18,43 @@
   4. Adds that folder to your User PATH (persistent, no admin).
   5. Downloads + runs register-context-menu.ps1 from the same tag or main (unless disabled).
 #>
-[CmdletBinding()]
-param(
-    [string]$Repo,
-    [string]$Version,
-    [switch]$NoContextMenu,
-    [Alias('Verbose2','d')][switch]$DebugLog
-)
-
 $ErrorActionPreference = "Stop"
+
+function Stop-Safely($Message) {
+    try { Write-Host "[jpg2pdf] $Message" -ForegroundColor Red } catch { }
+    exit 1
+}
+
+trap {
+    try { Die "Installer failed safely before completion: $_" } catch { Stop-Safely "Installer failed safely before initialization: $_" }
+}
+
+try {
+    $Repo = $null
+    $Version = $null
+    $NoContextMenu = $false
+    $DebugLog = $false
+
+    for ($i = 0; $i -lt $args.Count; $i++) {
+        $arg = [string]$args[$i]
+        switch -Regex ($arg) {
+            '^(--repo|-Repo)$' {
+                $i++
+                if ($i -ge $args.Count) { throw "Missing value for $arg" }
+                $Repo = [string]$args[$i]
+                continue
+            }
+            '^(--version|-Version)$' {
+                $i++
+                if ($i -ge $args.Count) { throw "Missing value for $arg" }
+                $Version = [string]$args[$i]
+                continue
+            }
+            '^(--no-context-menu|-NoContextMenu)$' { $NoContextMenu = $true; continue }
+            '^(--debug|--verbose|-DebugLog|-Verbose2|-d|-v)$' { $DebugLog = $true; continue }
+            default { throw "Unknown installer option: $arg" }
+        }
+    }
 
 $script:DebugMode = $false
 if ($DebugLog) { $script:DebugMode = $true }
@@ -56,9 +84,7 @@ function Die ($m)  {
     if ($script:LogFile) { Write-Host "[jpg2pdf] Full log: $script:LogFile" -ForegroundColor Red }
     exit 1
 }
-trap { Die "Installer failed safely before completion: $_" }
 
-try {
     if (-not $Repo) { $Repo = $(if ($env:JPG2PDF_REPO) { $env:JPG2PDF_REPO } else { "alimtvnetwork/img-pdf" }) }
     if (-not $Version) { $Version = $(if ($env:JPG2PDF_VERSION) { $env:JPG2PDF_VERSION } else { "" }) }
     if ($env:JPG2PDF_NO_CONTEXT_MENU -eq "1") { $NoContextMenu = $true }

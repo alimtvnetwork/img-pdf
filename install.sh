@@ -5,7 +5,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | sh
 #
 #   # Pin a specific version:
-#   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | JPG2PDF_VERSION=v1.2.2 sh
+#   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | JPG2PDF_VERSION=v1.2.3 sh
 #
 #   # Install elsewhere (default: $HOME/.local/bin):
 #   curl -fsSL https://.../install.sh | JPG2PDF_PREFIX=$HOME/bin sh
@@ -17,16 +17,24 @@
 #   4. Downloads the matching binary into $JPG2PDF_PREFIX (default $HOME/.local/bin).
 #   5. chmod +x and reports next steps.
 
-set -eu
-
-REPO="${JPG2PDF_REPO:-alimtvnetwork/img-pdf}"
-VERSION="${JPG2PDF_VERSION:-}"
-PREFIX="${JPG2PDF_PREFIX:-$HOME/.local/bin}"
-GITHUB_API="https://api.github.com"
-
 info() { printf '\033[36m[jpg2pdf]\033[0m %s\n' "$*"; }
 warn() { printf '\033[33m[jpg2pdf]\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[31m[jpg2pdf]\033[0m %s\n' "$*" >&2; exit 1; }
+on_exit() { code=$?; [ "$code" -eq 0 ] || warn "Installer failed safely before completion (exit $code)."; }
+on_signal() { warn "Installer interrupted safely before completion."; exit 1; }
+trap on_exit 0
+trap on_signal HUP INT TERM
+
+set -eu
+
+DEFAULT_PREFIX="${HOME:-}/.local/bin"
+if [ -z "${HOME:-}" ] && [ -z "${JPG2PDF_PREFIX:-}" ]; then
+  DEFAULT_PREFIX="/usr/local/bin"
+fi
+REPO="${JPG2PDF_REPO:-alimtvnetwork/img-pdf}"
+VERSION="${JPG2PDF_VERSION:-}"
+PREFIX="${JPG2PDF_PREFIX:-$DEFAULT_PREFIX}"
+GITHUB_API="https://api.github.com"
 
 if [ -z "$REPO" ]; then
   die "Set the repo: JPG2PDF_REPO=your-user/your-repo curl ... | sh"

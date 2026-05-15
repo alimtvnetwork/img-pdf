@@ -4,6 +4,16 @@ All notable changes to `jpg2pdf` are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3] - 2026-05-15
+
+### Fixed
+- Windows installer: moved environment/default resolution inside the protected install block and added a top-level trap so failures before any GitHub read/download are reported safely instead of crashing the shell.
+- Windows installer: made main-branch artifact extraction resilient when the temp directory variable is missing or cleanup runs after an early failure.
+- macOS/Linux installer: added first-line-safe exit/signal traps before reading environment defaults, with a safe prefix fallback when `$HOME` is unavailable.
+
+### Changed
+- Root and tool README pinned-version install snippets now reference `v1.2.3`.
+
 ## [1.2.2] - 2026-05-15
 
 ### Fixed

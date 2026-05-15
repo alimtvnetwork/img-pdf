@@ -6,7 +6,7 @@
   irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 
   # Pin a specific version:
-  $env:JPG2PDF_VERSION = "v1.2.2"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
+  $env:JPG2PDF_VERSION = "v1.2.3"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 
   # Skip Explorer context-menu registration:
   $env:JPG2PDF_NO_CONTEXT_MENU = "1"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
@@ -20,8 +20,8 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Repo    = $(if ($env:JPG2PDF_REPO)    { $env:JPG2PDF_REPO }    else { "alimtvnetwork/img-pdf" }),
-    [string]$Version = $(if ($env:JPG2PDF_VERSION) { $env:JPG2PDF_VERSION } else { "" }),
+    [string]$Repo,
+    [string]$Version,
     [switch]$NoContextMenu
 )
 
@@ -29,8 +29,11 @@ $ErrorActionPreference = "Stop"
 function Info($m) { Write-Host "[jpg2pdf] $m" -ForegroundColor Cyan }
 function Warn($m) { Write-Host "[jpg2pdf] $m" -ForegroundColor Yellow }
 function Die ($m) { Write-Host "[jpg2pdf] $m" -ForegroundColor Red; exit 1 }
+trap { Die "Installer failed safely before completion: $_" }
 
 try {
+    if (-not $Repo) { $Repo = $(if ($env:JPG2PDF_REPO) { $env:JPG2PDF_REPO } else { "alimtvnetwork/img-pdf" }) }
+    if (-not $Version) { $Version = $(if ($env:JPG2PDF_VERSION) { $env:JPG2PDF_VERSION } else { "" }) }
     if ($env:JPG2PDF_NO_CONTEXT_MENU -eq "1") { $NoContextMenu = $true }
     if (-not $Repo) {
         Die "Set the repo: `$env:JPG2PDF_REPO = 'your-user/your-repo'  (or pass -Repo)."
@@ -73,11 +76,13 @@ try {
             $artifact = $artifacts.artifacts | Where-Object { $_.name -eq $Asset -and -not $_.expired } | Select-Object -First 1
             if (-not $artifact) { continue }
 
-            $tmpRoot = Join-Path $env:TEMP ("jpg2pdf-artifact-" + [guid]::NewGuid().ToString("N"))
-            $zipFile = Join-Path $tmpRoot "artifact.zip"
-            $extractDir = Join-Path $tmpRoot "unzipped"
-            New-Item -ItemType Directory -Force -Path $tmpRoot | Out-Null
+            $tmpRoot = $null
             try {
+                $tempBase = if ($env:TEMP) { $env:TEMP } else { [System.IO.Path]::GetTempPath() }
+                $tmpRoot = Join-Path $tempBase ("jpg2pdf-artifact-" + [guid]::NewGuid().ToString("N"))
+                $zipFile = Join-Path $tmpRoot "artifact.zip"
+                $extractDir = Join-Path $tmpRoot "unzipped"
+                New-Item -ItemType Directory -Force -Path $tmpRoot | Out-Null
                 Info "Downloading main-branch artifact from run $($run.id)"
                 Invoke-WebRequest -Headers $headers -Uri $artifact.archive_download_url -OutFile $zipFile -UseBasicParsing
                 Expand-Archive -Path $zipFile -DestinationPath $extractDir -Force
@@ -95,7 +100,7 @@ try {
             } catch {
                 Warn "Main-branch artifact download failed: $_"
             } finally {
-                Remove-Item -LiteralPath $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue
+                if ($tmpRoot) { Remove-Item -LiteralPath $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue }
             }
         }
         return $false

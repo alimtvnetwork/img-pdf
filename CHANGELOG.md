@@ -4,6 +4,15 @@ All notable changes to `jpg2pdf` are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-05-15
+
+### Fixed
+- Windows installer: replaced the remaining GitHub JSON reads with guarded HTTP reads plus guarded JSON parsing, so a bad release/API response cannot abort before the main-branch artifact fallback runs.
+- Verified the release-missing path continues into main-branch artifact lookup instead of crashing.
+
+### Changed
+- Pinned-version install snippets in `README.md`, `tools/jpg2pdf/README.md`, `install.ps1`, and `install.sh` now reference `v1.3.1`.
+
 ## [1.3.0] - 2026-05-15
 
 ### Fixed

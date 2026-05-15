@@ -10,9 +10,10 @@
 - Version bumped to `1.1.0` in both `VERSION` and `__version__`.
 - Root `README.md` updated: pinned version `v1.1.0`, mixed-input table, `--ask-strength` example.
 - Memory system bootstrapped under `.lovable/`.
+- Installer specs/memory require release -> main artifact -> Python source fallback with reference-style guarded crash logging.
 
 ## 🔄 In Progress
-- *(none — awaiting user-side Windows work)*
+- Harden `install.ps1` and `install.sh` so every installer step logs failures and falls back without crashing.
 
 ## ⏳ Pending (Windows-only, user must do)
 1. Capture real `context-menu.png` + `demo.gif` and replace placeholders.

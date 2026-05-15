@@ -6,7 +6,7 @@
   irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 
   # Pin a specific version:
-  $env:JPG2PDF_VERSION = "v1.3.5"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
+  $env:JPG2PDF_VERSION = "v1.3.6"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 
   # Skip Explorer context-menu registration:
   $env:JPG2PDF_NO_CONTEXT_MENU = "1"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
@@ -61,10 +61,10 @@ try {
         return $Default
     }
 
-    $Repo = $null
-    $Version = $null
-    $NoContextMenu = $false
-    $DebugLog = $false
+    $script:Repo = $null
+    $script:Version = $null
+    $script:NoContextMenu = $false
+    $script:DebugLog = $false
 
     try {
         for ($i = 0; $i -lt $InstallerArgs.Count; $i++) {
@@ -73,17 +73,17 @@ try {
                 '^(--repo|-Repo)$' {
                     $i++
                     if ($i -ge $InstallerArgs.Count) { throw "Missing value for $arg" }
-                    $Repo = [string]$InstallerArgs[$i]
+                    $script:Repo = [string]$InstallerArgs[$i]
                     continue
                 }
                 '^(--version|-Version)$' {
                     $i++
                     if ($i -ge $InstallerArgs.Count) { throw "Missing value for $arg" }
-                    $Version = [string]$InstallerArgs[$i]
+                    $script:Version = [string]$InstallerArgs[$i]
                     continue
                 }
-                '^(--no-context-menu|-NoContextMenu)$' { $NoContextMenu = $true; continue }
-                '^(--debug|--verbose|-DebugLog|-Verbose|-Verbose2|-d|-v)$' { $DebugLog = $true; continue }
+                '^(--no-context-menu|-NoContextMenu)$' { $script:NoContextMenu = $true; continue }
+                '^(--debug|--verbose|-DebugLog|-Verbose|-Verbose2|-d|-v)$' { $script:DebugLog = $true; continue }
                 default { throw "Unknown installer option: $arg" }
             }
         }
@@ -94,7 +94,7 @@ try {
 
 
 $script:DebugMode = $false
-if ($DebugLog) { $script:DebugMode = $true }
+if ($script:DebugLog) { $script:DebugMode = $true }
 if ((Get-SafeEnv "JPG2PDF_DEBUG") -eq "1") { $script:DebugMode = $true }
 
 $script:LogFile = $null
@@ -178,7 +178,7 @@ function Resolve-SafePath($Path) {
 }
 function Save-SafeUrl($Description, $Uri, $OutFile) {
     Debug2 "GET $Uri ($Description)"
-    return Invoke-SafeBool $Description { Invoke-WebRequest -Headers $headers -Uri $Uri -OutFile $OutFile -UseBasicParsing -ErrorAction Stop }
+    return Invoke-SafeBool $Description { Invoke-WebRequest -Headers $script:headers -Uri $Uri -OutFile $OutFile -UseBasicParsing -ErrorAction Stop }
 }
 function Convert-SafeJson($Description, $Raw) {
     try {
@@ -192,10 +192,10 @@ function Convert-SafeJson($Description, $Raw) {
 }
 
     Invoke-InstallerStep "Resolve installer settings" {
-        if (-not $Repo) { $Repo = Get-SafeEnv "JPG2PDF_REPO" "alimtvnetwork/img-pdf" }
-        if (-not $Version) { $Version = Get-SafeEnv "JPG2PDF_VERSION" }
-        if ((Get-SafeEnv "JPG2PDF_NO_CONTEXT_MENU") -eq "1") { $NoContextMenu = $true }
-        if (-not $Repo) {
+        if (-not $script:Repo) { $script:Repo = Get-SafeEnv "JPG2PDF_REPO" "alimtvnetwork/img-pdf" }
+        if (-not $script:Version) { $script:Version = Get-SafeEnv "JPG2PDF_VERSION" }
+        if ((Get-SafeEnv "JPG2PDF_NO_CONTEXT_MENU") -eq "1") { $script:NoContextMenu = $true }
+        if (-not $script:Repo) {
             Die "Set the repo: `$env:JPG2PDF_REPO = 'your-user/your-repo'  (or pass -Repo)."
         }
     } "default repo and no pinned version" -Required | Out-Null
@@ -204,21 +204,21 @@ function Convert-SafeJson($Description, $Raw) {
         if ($script:DebugMode) {
             Info "Debug mode enabled. Log: $(if ($script:LogFile) { $script:LogFile } else { '<unavailable>' })"
             Debug2 "PSVersion: $($PSVersionTable.PSVersion)  OS: $($PSVersionTable.OS)"
-            Debug2 "Repo=$Repo  Version=$Version  NoContextMenu=$NoContextMenu"
+            Debug2 "Repo=$script:Repo  Version=$script:Version  NoContextMenu=$script:NoContextMenu"
             Debug2 "USERPROFILE=$(Get-SafeEnv 'USERPROFILE')  TEMP=$(Get-SafeEnv 'TEMP')"
         }
     } "skip debug environment output" | Out-Null
 
     Invoke-InstallerStep "Configure GitHub HTTP headers" {
         try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { Add-CrashReport "SecurityProtocol" "TLS setup" "continue with host default TLS" $_; Warn "Could not force TLS 1.2 safely: $_" }
-        $headers = @{ "User-Agent" = "jpg2pdf-installer"; "Accept" = "application/vnd.github+json" }
+        $script:headers = @{ "User-Agent" = "jpg2pdf-installer"; "Accept" = "application/vnd.github+json" }
         $token = Get-SafeEnv "GITHUB_TOKEN"
-        if ($token) { $headers["Authorization"] = "Bearer $token" }
+        if ($token) { $script:headers["Authorization"] = "Bearer $token" }
     } "anonymous GitHub requests" -Required | Out-Null
 
     function Get-GitHubJson($Uri, $Description) {
         Debug2 "GET $Uri ($Description)"
-        $response = Invoke-Safe "$Description HTTP read" { Invoke-WebRequest -Headers $headers -Uri $Uri -UseBasicParsing -ErrorAction Stop } $null
+        $response = Invoke-Safe "$Description HTTP read" { Invoke-WebRequest -Headers $script:headers -Uri $Uri -UseBasicParsing -ErrorAction Stop } $null
         if (-not $response) { return $null }
         $content = Invoke-Safe "$Description response content read" { [string]$response.Content } ""
         if (-not $content) { Add-CrashReport "response.Content" $Description "null JSON result" "empty response content" }
@@ -341,7 +341,7 @@ function Convert-SafeJson($Description, $Raw) {
     }
 
     function Install-SourceFallback($Repo, $Version, $OutFile, $BinDir) {
-        if ($Version) {
+        if ($script:Version) {
             $from = Install-SourceFromRef $Repo $Version "tag" $OutFile $BinDir
             if ($from) { return $from }
             Warn "Pinned source fallback failed. Trying main branch source."
@@ -350,79 +350,79 @@ function Convert-SafeJson($Description, $Raw) {
     }
 
     Invoke-InstallerStep "Resolve install paths" {
-        $asset = "jpg2pdf-windows-x64.exe"
-        $homeDir = Get-SafeEnv "USERPROFILE"
-        if (-not $homeDir) { try { if ($HOME) { $homeDir = [string]$HOME } } catch { Add-CrashReport "HOME" "Resolve install paths" "current directory" $_ } }
-        if (-not $homeDir) { try { $homeDir = (Get-Location).Path } catch { Add-CrashReport "Get-Location" "Resolve install paths" "." $_; $homeDir = "." } }
-        $binDir  = Join-SafePath $homeDir "Tools\bin"
-        $exePath = Join-SafePath $binDir "jpg2pdf.exe"
-        $cmdPath = Join-SafePath $binDir "jpg2pdf.cmd"
+        $script:asset = "jpg2pdf-windows-x64.exe"
+        $script:homeDir = Get-SafeEnv "USERPROFILE"
+        if (-not $script:homeDir) { try { if ($HOME) { $script:homeDir = [string]$HOME } } catch { Add-CrashReport "HOME" "Resolve install paths" "current directory" $_ } }
+        if (-not $script:homeDir) { try { $script:homeDir = (Get-Location).Path } catch { Add-CrashReport "Get-Location" "Resolve install paths" "." $_; $script:homeDir = "." } }
+        $script:binDir  = Join-SafePath $script:homeDir "Tools\bin"
+        $script:exePath = Join-SafePath $script:binDir "jpg2pdf.exe"
+        $script:cmdPath = Join-SafePath $script:binDir "jpg2pdf.cmd"
     } "install under current directory" -Required | Out-Null
 
     Invoke-InstallerStep "Create install directory" {
-        if (-not (Invoke-SafeBool "Install directory creation" { New-Item -ItemType Directory -Force -Path $binDir -ErrorAction Stop | Out-Null })) {
+        if (-not (Invoke-SafeBool "Install directory creation" { New-Item -ItemType Directory -Force -Path $script:binDir -ErrorAction Stop | Out-Null })) {
             Die "Could not create install directory safely."
         }
     } "abort install" -Required | Out-Null
 
-    $installedFrom = $null
+    $script:installedFrom = $null
     Invoke-InstallerStep "Download installer binary" {
-        if ($Version) {
-            Info "Installing jpg2pdf $Version"
-            if (Download-ReleaseAsset $Repo $Version $asset $exePath) { $installedFrom = "release $Version" }
-            if (-not $installedFrom) {
-                Add-CrashReport "release asset:$asset" "version-pinned install" "latest main-branch artifact" "release asset unavailable"
+        if ($script:Version) {
+            Info "Installing jpg2pdf $script:Version"
+            if (Download-ReleaseAsset $script:Repo $script:Version $script:asset $script:exePath) { $script:installedFrom = "release $script:Version" }
+            if (-not $script:installedFrom) {
+                Add-CrashReport "release asset:$script:asset" "version-pinned install" "latest main-branch artifact" "release asset unavailable"
                 Warn "Release asset was not available. Falling back to the latest successful main-branch artifact."
-                if (Download-MainArtifact $Repo $asset $exePath) {
-                    $installedFrom = "latest main-branch artifact"
-                    $Version = ""
+                if (Download-MainArtifact $script:Repo $script:asset $script:exePath) {
+                    $script:installedFrom = "latest main-branch artifact"
+                    $script:Version = ""
                 }
             }
         } else {
-            Info "Resolving latest release of $Repo ..."
-            $rel = Get-GitHubJson "https://api.github.com/repos/$Repo/releases/latest" "Latest release lookup"
+            Info "Resolving latest release of $script:Repo ..."
+            $rel = Get-GitHubJson "https://api.github.com/repos/$script:Repo/releases/latest" "Latest release lookup"
             if ($rel -and $rel.tag_name) {
-                $Version = $rel.tag_name
-                Info "Installing jpg2pdf $Version"
-                if (Download-ReleaseAsset $Repo $Version $asset $exePath) { $installedFrom = "release $Version" }
-                if (-not $installedFrom) { Add-CrashReport "release asset:$asset" "latest-release install" "latest main-branch artifact" "release asset unavailable" }
+                $script:Version = $rel.tag_name
+                Info "Installing jpg2pdf $script:Version"
+                if (Download-ReleaseAsset $script:Repo $script:Version $script:asset $script:exePath) { $script:installedFrom = "release $script:Version" }
+                if (-not $script:installedFrom) { Add-CrashReport "release asset:$script:asset" "latest-release install" "latest main-branch artifact" "release asset unavailable" }
             } else {
                 Add-CrashReport "latest release" "release resolution" "latest main-branch artifact" "no GitHub Release found"
                 Warn "No GitHub Release found. Falling back to the latest successful main-branch artifact."
             }
 
-            if (-not $installedFrom) {
-                if (Download-MainArtifact $Repo $asset $exePath) {
-                    $installedFrom = "latest main-branch artifact"
+            if (-not $script:installedFrom) {
+                if (Download-MainArtifact $script:Repo $script:asset $script:exePath) {
+                    $script:installedFrom = "latest main-branch artifact"
                 }
             }
         }
     } "release download -> latest main-branch artifact" | Out-Null
 
-    if (-not $installedFrom) {
+    if (-not $script:installedFrom) {
         Warn "No usable binary was available. Falling back to source/Python install."
-        if (Test-SafePath $exePath) { Invoke-SafeBool "Remove incomplete binary before source fallback" { Remove-Item -LiteralPath $exePath -Force -ErrorAction Stop } | Out-Null }
-        $sourceFrom = Install-SourceFallback $Repo $Version $cmdPath $binDir
+        if (Test-SafePath $script:exePath) { Invoke-SafeBool "Remove incomplete binary before source fallback" { Remove-Item -LiteralPath $script:exePath -Force -ErrorAction Stop } | Out-Null }
+        $sourceFrom = Install-SourceFallback $script:Repo $script:Version $script:cmdPath $script:binDir
         if ($sourceFrom) {
-            $installedFrom = $sourceFrom
-            $exePath = $cmdPath
+            $script:installedFrom = $sourceFrom
+            $script:exePath = $script:cmdPath
         }
     }
 
-    if (-not $installedFrom) {
+    if (-not $script:installedFrom) {
         Die "Could not install jpg2pdf. Publish a release, run the main-branch build, install Python, or set GITHUB_TOKEN if artifact access requires it."
     }
 
     Invoke-InstallerStep "Verify installed binary" {
-        $verLine = & $exePath --version 2>&1
-        Info "Installed from ${installedFrom}: $verLine -> $exePath"
+        $verLine = & $script:exePath --version 2>&1
+        Info "Installed from ${script:installedFrom}: $verLine -> $script:exePath"
     } "continue after successful download" | Out-Null
 
     Invoke-InstallerStep "Update PATH" {
         $current = [Environment]::GetEnvironmentVariable("Path", "User")
         if (-not $current) { $current = "" }
         $entries = $current.Split(';') | ForEach-Object { $_.Trim().TrimEnd('\') } | Where-Object { $_ }
-        $resolved = (Resolve-SafePath $binDir).TrimEnd('\')
+        $resolved = (Resolve-SafePath $script:binDir).TrimEnd('\')
         if ($entries -notcontains $resolved) {
             [Environment]::SetEnvironmentVariable("Path", (($entries + $resolved) -join ';'), "User")
             Info "Added $resolved to User PATH (open a new terminal to pick it up)."
@@ -436,13 +436,13 @@ function Convert-SafeJson($Description, $Raw) {
     } "binary installed; skip PATH update" | Out-Null
 
     Invoke-InstallerStep "Register context menu" {
-        if (-not $NoContextMenu) {
-            $ctxRef = $(if ($Version) { $Version } else { "main" })
-            $ctxUrl  = "https://raw.githubusercontent.com/$Repo/$ctxRef/tools/jpg2pdf/scripts/register-context-menu.ps1"
+        if (-not $script:NoContextMenu) {
+            $ctxRef = $(if ($script:Version) { $script:Version } else { "main" })
+            $ctxUrl  = "https://raw.githubusercontent.com/$script:Repo/$ctxRef/tools/jpg2pdf/scripts/register-context-menu.ps1"
             $ctxFile = Join-SafePath (Get-SafeTempDir) "jpg2pdf-register-context-menu.ps1"
             Info "Fetching context-menu registrar from $ctxUrl"
             if (Save-SafeUrl "Context-menu registrar download" $ctxUrl $ctxFile) {
-                $null = Invoke-Safe "Context-menu registrar execution" { & powershell -NoProfile -ExecutionPolicy Bypass -File $ctxFile -ExePath $exePath } $null
+                $null = Invoke-Safe "Context-menu registrar execution" { & powershell -NoProfile -ExecutionPolicy Bypass -File $ctxFile -ExePath $script:exePath } $null
             }
         }
     } "skip context-menu registration" | Out-Null

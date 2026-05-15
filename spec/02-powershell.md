@@ -105,6 +105,22 @@ best-effort dependency install. Every source download, extraction, Python
 probe, dependency install, and wrapper write must be inside try/catch and must
 append to the installer crash report on failure.
 
+## Reference installer hardening pattern
+
+Follow the defensive style used by `alimtvnetwork/coding-guidelines-v20/install.ps1`:
+- Keep a top-level `trap` plus a master `try/catch`; neither path may show a raw
+  .NET stack trace or close before printing the log path.
+- Every step that reads an env var, resolves a path, calls GitHub, downloads,
+  extracts, copies, writes a wrapper, updates PATH, or invokes another script
+  must run through a guarded helper and must append a crash-report item on
+  failure.
+- Guarded helpers must not hide installer state changes in child scopes. Any
+  variable needed by later steps must be set in script scope or outside the
+  helper wrapper, otherwise the next step may see `$null` and crash.
+- The verbose log must always end with a dedicated crash report section listing
+  the failed variable/step, where it failed, and which fallback was used, even
+  when the installer eventually succeeds via source/Python fallback.
+
 ## Debug/verbose flag
 
 `-DebugLog` (alias `-d`, `-Verbose2`) or `JPG2PDF_DEBUG=1` env var enables:

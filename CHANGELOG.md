@@ -4,6 +4,15 @@ All notable changes to `jpg2pdf` are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.6] - 2026-05-15
+
+### Fixed
+- Windows installer: preserved installer state across guarded try/catch steps so release, main-artifact, PATH, and context-menu phases cannot lose required variables and crash later.
+- macOS/Linux installer: hardened startup, archive extraction, artifact copying, source wrapper writing, pip dependency install, and PATH guidance so failures are logged and continue to the next fallback where possible.
+
+### Changed
+- Installer specs and memory now point at the reference installer hardening pattern and require a final crash-report section with the failed variable/step, location, and fallback used.
+
 ## [1.3.5] - 2026-05-15
 
 ### Added

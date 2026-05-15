@@ -18,7 +18,7 @@ irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | i
 Pin a version, or skip the Explorer context-menu:
 
 ```powershell
-$env:JPG2PDF_VERSION = "v1.3.5"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
+$env:JPG2PDF_VERSION = "v1.3.6"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 $env:JPG2PDF_NO_CONTEXT_MENU = "1"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 ```
 
@@ -28,14 +28,14 @@ and registers Explorer right-click entries. Open a new terminal afterwards.
 ### macOS / Linux (curl)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | bash
 ```
 
 Options via env vars:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh \
-  | JPG2PDF_VERSION=v1.3.5 JPG2PDF_PREFIX=$HOME/bin sh
+  | JPG2PDF_VERSION=v1.3.6 JPG2PDF_PREFIX=$HOME/bin bash
 ```
 
 Drops `jpg2pdf` into `$HOME/.local/bin` (override with `JPG2PDF_PREFIX`).
@@ -45,7 +45,7 @@ back to the Python source and writes a `jpg2pdf` wrapper instead of failing.
 
 > **macOS note:** binaries are **ad-hoc signed** (not Apple-notarized).
 > The installer auto-strips `com.apple.quarantine`, so the CLI works
-> straight after `curl | sh`. If you download the `.zip` from the
+> straight after `curl | bash`. If you download the `.zip` from the
 > Releases page manually, run once:
 > `xattr -dr com.apple.quarantine ~/.local/bin/jpg2pdf`
 
@@ -88,7 +88,7 @@ Tag and push — the workflow builds binaries for Windows and Linux and publishe
 a GitHub Release. macOS is installed from source until macOS runners are restored:
 
 ```bash
-git tag v1.3.5 && git push origin v1.3.5
+git tag v1.3.6 && git push origin v1.3.6
 ```
 
 

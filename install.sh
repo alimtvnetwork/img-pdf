@@ -1,14 +1,14 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # One-liner installer for jpg2pdf on Linux & macOS.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | bash
 #
 #   # Pin a specific version:
-#   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | JPG2PDF_VERSION=v1.3.5 sh
+#   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | JPG2PDF_VERSION=v1.3.6 bash
 #
 #   # Install elsewhere (default: $HOME/.local/bin):
-#   curl -fsSL https://.../install.sh | JPG2PDF_PREFIX=$HOME/bin sh
+#   curl -fsSL https://.../install.sh | JPG2PDF_PREFIX=$HOME/bin bash
 #
 # What it does:
 #   1. Detects OS + arch.
@@ -17,17 +17,34 @@
 #   4. If no binary exists, falls back to a Python source install.
 #   5. Installs into $JPG2PDF_PREFIX (default $HOME/.local/bin), chmod +x, and reports next steps.
 
+if (set -o pipefail) 2>/dev/null; then set -o pipefail; fi
+set -e
+
+PWD_SAFE="$(pwd 2>/dev/null || printf /tmp)"
+TMP_DIR="${TMPDIR:-/tmp}"
+if [ ! -d "$TMP_DIR" ]; then TMP_DIR="/tmp"; fi
+if [ ! -d "$TMP_DIR" ]; then TMP_DIR="$PWD_SAFE"; fi
+HOME_DIR="${HOME:-$PWD_SAFE}"
 DEBUG="${JPG2PDF_DEBUG:-0}"
+SHOW_HELP=0
 for _arg in "$@"; do
   case "$_arg" in
     --debug|--verbose|-d|-v) DEBUG=1 ;;
+    --help|-h) SHOW_HELP=1 ;;
   esac
 done
+if [ "$SHOW_HELP" = "1" ]; then
+  printf '%s\n' 'Usage: install.sh [--debug] [--help]'
+  printf '%s\n' 'Env: JPG2PDF_VERSION=vX.Y.Z JPG2PDF_PREFIX=$HOME/bin JPG2PDF_REPO=owner/repo'
+  exit 0
+fi
 
-LOG_FILE="${JPG2PDF_LOG:-${TMPDIR:-/tmp}/jpg2pdf-install-$(date +%Y%m%d-%H%M%S)-$$.log}"
+LOG_FILE="${JPG2PDF_LOG:-$TMP_DIR/jpg2pdf-install-$(date +%Y%m%d-%H%M%S)-$$.log}"
 : > "$LOG_FILE" 2>/dev/null || LOG_FILE=""
-SAFE_DIE_MARKER="${TMPDIR:-/tmp}/jpg2pdf-install-die-$$.flag"
+SAFE_DIE_MARKER="$TMP_DIR/jpg2pdf-install-die-$$.flag"
 rm -f "$SAFE_DIE_MARKER" 2>/dev/null || true
+CRASH_REPORTS=""
+CRASH_REPORT_WRITTEN=0
 
 _log() { [ -n "$LOG_FILE" ] && printf '%s %s\n' "$(date +%H:%M:%S)" "$*" >> "$LOG_FILE" 2>/dev/null || true; }
 info() { _log "INFO  $*"; printf '\033[36m[jpg2pdf]\033[0m %s\n' "$*"; }
@@ -39,14 +56,22 @@ add_crash_report() {
   cr_fallback="$3"
   cr_error="$4"
   _log "CRASH variable=$cr_var where=$cr_where fallback=$cr_fallback error=$cr_error"
+  CRASH_REPORTS="${CRASH_REPORTS}
+variable=$cr_var where=$cr_where fallback=$cr_fallback error=$cr_error"
 }
 write_crash_report_section() {
   cr_reason="$1"
   [ -n "$LOG_FILE" ] || return 0
+  [ "$CRASH_REPORT_WRITTEN" = "0" ] || return 0
+  CRASH_REPORT_WRITTEN=1
   {
     printf '\n===== Installer crash report =====\n'
     printf 'Reason: %s\n' "$cr_reason"
-    printf 'Recent guarded failures and fallbacks are listed as CRASH lines above.\n'
+    if [ -n "$CRASH_REPORTS" ]; then
+      printf '%s\n' "$CRASH_REPORTS" | sed '/^$/d'
+    else
+      printf 'No guarded read failures were recorded before exit.\n'
+    fi
     printf 'Last fallback: %s\n' "${LAST_FALLBACK:-none}"
     printf '===== End installer crash report =====\n'
   } >> "$LOG_FILE" 2>/dev/null || true
@@ -84,25 +109,28 @@ if [ "$DEBUG" = "1" ]; then
   debug "uname: $(uname -a 2>/dev/null || echo unknown)"
   debug "shell: ${SHELL:-unknown}  user: $(id -un 2>/dev/null || echo unknown)"
   debug "PATH: ${PATH:-}"
+  if [ -n "$LOG_FILE" ]; then
+    exec 9>>"$LOG_FILE" 2>/dev/null || true
+    BASH_XTRACEFD=9
+  fi
   set -x
 fi
 
-DEFAULT_PREFIX="${HOME:-}/.local/bin"
+DEFAULT_PREFIX="$HOME_DIR/.local/bin"
 if [ -z "${HOME:-}" ] && [ -z "${JPG2PDF_PREFIX:-}" ]; then
-  DEFAULT_PREFIX="/usr/local/bin"
+  DEFAULT_PREFIX="$PWD_SAFE/.local/bin"
 fi
-HOME_DIR="${HOME:-}"
 REPO="${JPG2PDF_REPO:-alimtvnetwork/img-pdf}"
 VERSION="${JPG2PDF_VERSION:-}"
 PREFIX="${JPG2PDF_PREFIX:-$DEFAULT_PREFIX}"
 GITHUB_API="https://api.github.com"
 
 if [ -z "$REPO" ]; then
-  die "Set the repo: JPG2PDF_REPO=your-user/your-repo curl ... | sh"
+  die "Set the repo: JPG2PDF_REPO=your-user/your-repo curl ... | bash"
 fi
 
-uname_s="$(uname -s)"
-uname_m="$(uname -m)"
+if ! uname_s="$(uname -s 2>/dev/null)"; then add_crash_report "uname -s" "Platform detection" "unsupported OS" "uname failed"; die "Could not detect OS."; fi
+if ! uname_m="$(uname -m 2>/dev/null)"; then add_crash_report "uname -m" "Platform detection" "unsupported arch" "uname failed"; die "Could not detect architecture."; fi
 case "$uname_s" in
   Linux)  os=linux  ;;
   Darwin) os=macos  ;;
@@ -156,7 +184,7 @@ fi
 try_get() {
   tg_desc="$1"
   tg_url="$2"
-  tg_err_file="${TMPDIR:-/tmp}/jpg2pdf-installer-get-$$.err"
+  tg_err_file="$TMP_DIR/jpg2pdf-installer-get-$$.err"
   if tg_body="$(GET "$tg_url" 2>"$tg_err_file")"; then
     rm -f "$tg_err_file"
     printf '%s' "$tg_body"
@@ -183,7 +211,7 @@ try_download() {
 
 json_value() {
   key="$1"
-  sed -n 's/.*"'"$key"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1
+  sed -n 's/.*"'"$key"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1 || true
 }
 
 download_release_asset() {
@@ -202,20 +230,21 @@ unpack_artifact() {
     return 1
   fi
   if command -v unzip >/dev/null 2>&1; then
-    unzip -q "$zip_file" -d "$extract_dir"
-    return 0
+    if unzip -q "$zip_file" -d "$extract_dir"; then return 0; fi
+    add_crash_report "unzip" "Artifact extraction" "try python/ditto extraction" "$zip_file"
   fi
   if command -v python3 >/dev/null 2>&1; then
-    python3 - "$zip_file" "$extract_dir" <<'PYC'
+    if python3 - "$zip_file" "$extract_dir" <<'PYC'
 import sys, zipfile
 with zipfile.ZipFile(sys.argv[1]) as zf:
     zf.extractall(sys.argv[2])
 PYC
-    return 0
+    then return 0; fi
+    add_crash_report "python unzip" "Artifact extraction" "try ditto/source fallback" "$zip_file"
   fi
   if [ "$os" = "macos" ] && command -v ditto >/dev/null 2>&1; then
-    ditto -x -k "$zip_file" "$extract_dir"
-    return 0
+    if ditto -x -k "$zip_file" "$extract_dir"; then return 0; fi
+    add_crash_report "ditto" "Artifact extraction" "source/Python fallback" "$zip_file"
   fi
   return 1
 }
@@ -224,7 +253,7 @@ download_main_artifact() {
   out="$1"
   info "Looking for latest main-branch artifact named $asset ..."
   runs_json="$(try_get "Main-branch workflow lookup" "$GITHUB_API/repos/$REPO/actions/workflows/release.yml/runs?branch=main&status=success&per_page=10")" || return 1
-  artifacts_urls="$(printf '%s' "$runs_json" | grep -o '"artifacts_url"[[:space:]]*:[[:space:]]*"[^"]*"' | sed -n 's/.*"artifacts_url":[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 10)"
+  artifacts_urls="$(printf '%s' "$runs_json" | grep -o '"artifacts_url"[[:space:]]*:[[:space:]]*"[^"]*"' | sed -n 's/.*"artifacts_url":[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 10 || true)"
   if [ -z "$artifacts_urls" ]; then
     add_crash_report "artifacts_url" "Main-branch artifact lookup" "source/Python fallback" "no successful main runs with artifacts"
     return 1
@@ -237,7 +266,7 @@ download_main_artifact() {
     archive_url="$(printf '%s' "$artifact_line" | json_value archive_download_url)"
     [ -n "$archive_url" ] || continue
 
-    tmp_base="${TMPDIR:-/tmp}"
+    tmp_base="$TMP_DIR"
     tmp_root="$tmp_base/jpg2pdf-artifact-$$"
     zip_file="$tmp_root/artifact.zip"
     extract_dir="$tmp_root/unzipped"
@@ -250,12 +279,14 @@ download_main_artifact() {
       if unpack_artifact "$zip_file" "$extract_dir"; then
         candidate="$extract_dir/$asset"
         if [ ! -f "$candidate" ]; then
-          candidate="$(find "$extract_dir" -type f -name "$asset" | head -n 1 || true)"
+          candidate="$(find "$extract_dir" -type f -name "$asset" 2>/dev/null | head -n 1 || true)"
         fi
         if [ -n "$candidate" ] && [ -f "$candidate" ]; then
-          cp "$candidate" "$out"
-          rm -rf "$tmp_root"
-          return 0
+          if cp "$candidate" "$out"; then
+            rm -rf "$tmp_root"
+            return 0
+          fi
+          add_crash_report "artifact copy" "Main-branch artifact install" "try next fallback" "$candidate -> $out"
         fi
         warn "Artifact archive did not contain $asset."
       else
@@ -284,7 +315,7 @@ install_source_from_ref() {
     return 1
   fi
 
-  tmp_base="${TMPDIR:-/tmp}"
+  tmp_base="$TMP_DIR"
   tmp_root="$tmp_base/jpg2pdf-source-$$"
   tar_file="$tmp_root/source.tar.gz"
   extract_dir="$tmp_root/extracted"
@@ -317,7 +348,7 @@ install_source_from_ref() {
     return 1
   fi
 
-  src_root="$(find "$extract_dir" -type f -path '*/tools/jpg2pdf/src/jpg2pdf.py' -print 2>/dev/null | sed 's#/tools/jpg2pdf/src/jpg2pdf.py$##' | head -n 1)"
+  src_root="$(find "$extract_dir" -type f -path '*/tools/jpg2pdf/src/jpg2pdf.py' -print 2>/dev/null | sed 's#/tools/jpg2pdf/src/jpg2pdf.py$##' | head -n 1 || true)"
   if [ -z "$src_root" ]; then
     add_crash_report "source tree" "Source fallback lookup" "try next fallback" "tools/jpg2pdf/src/jpg2pdf.py not found"
     rm -rf "$tmp_root" 2>/dev/null || true
@@ -337,11 +368,15 @@ install_source_from_ref() {
   req_file="$install_root/tools/jpg2pdf/requirements.txt"
   if [ -f "$req_file" ]; then
     if [ -n "$LOG_FILE" ]; then
+      set +e
       "$py_cmd" -m pip install --user -r "$req_file" >> "$LOG_FILE" 2>&1
       pip_code=$?
+      set -e
     else
+      set +e
       "$py_cmd" -m pip install --user -r "$req_file" >/dev/null 2>&1
       pip_code=$?
+      set -e
     fi
     if [ "$pip_code" -ne 0 ]; then
       add_crash_report "pip requirements" "Source fallback dependencies" "write wrapper anyway" "pip install failed"
@@ -352,10 +387,15 @@ install_source_from_ref() {
   fi
 
   script_path="$install_root/tools/jpg2pdf/src/jpg2pdf.py"
-  cat > "$is_out" <<EOF
+  if ! cat > "$is_out" <<EOF
 #!/usr/bin/env sh
 exec "$py_cmd" "$script_path" "\$@"
 EOF
+  then
+    add_crash_report "wrapper write" "Source fallback wrapper" "try next fallback" "$is_out"
+    rm -rf "$tmp_root" 2>/dev/null || true
+    return 1
+  fi
   if ! chmod +x "$is_out"; then
     add_crash_report "wrapper chmod" "Source fallback wrapper" "continue" "$is_out"
   fi
@@ -441,7 +481,7 @@ else
   warn "Binary saved from $installed_from but --version failed; the file may be corrupt."
 fi
 
-case ":$PATH:" in
+case ":${PATH:-}:" in
   *":$PREFIX:"*) info "$PREFIX is already on PATH." ;;
   *)
     warn "$PREFIX is not on your PATH."

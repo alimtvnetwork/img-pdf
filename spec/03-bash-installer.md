@@ -71,6 +71,19 @@ and writes an executable wrapper at `$JPG2PDF_PREFIX/jpg2pdf`. Each network,
 archive, Python, pip, copy, and wrapper step must be guarded with `if ...; then`
 style handling and must log the exact fallback used.
 
+## Reference installer hardening pattern
+
+Match the operational behavior of `alimtvnetwork/coding-guidelines-v20/install.ps1`:
+- A top-level exit/signal handler must print a friendly failure and the log path.
+- Every env read, path calculation, platform detection, GitHub read, download,
+  extraction, copy, chmod, xattr, wrapper write, and PATH guidance step must be
+  guarded and log a crash-report row on failure.
+- macOS must never fail only because macOS binary assets are disabled. If the
+  release and main-branch artifact paths miss, the default fallback is Python
+  source install, then a wrapper at `$JPG2PDF_PREFIX/jpg2pdf`.
+- The log must contain a dedicated final crash report section with failed
+  variable/step, location, fallback used, and final fallback/result.
+
 ## Debug/verbose flag
 
 `--debug` / `--verbose` / `-d` / `-v` or `JPG2PDF_DEBUG=1`:

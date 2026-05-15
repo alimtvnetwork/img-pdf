@@ -189,15 +189,16 @@ img-pdf/
 
 ## 🚢 Cutting a release
 
-Tag & push — GitHub Actions builds binaries for Windows / Linux / macOS
-(x64 + Apple Silicon) and publishes a Release with `SHA256SUMS.txt`:
+Tag & push — GitHub Actions builds binaries for Windows and Linux and publishes
+a Release with `SHA256SUMS.txt`. macOS installs use the Python source fallback
+until macOS runners are restored:
 
 ```bash
 git tag v1.3.5 && git push origin v1.3.5
 ```
 
 Released artifacts: `jpg2pdf-windows-x64.exe`, `jpg2pdf-linux-x64`,
-`jpg2pdf-linux-arm64`, `jpg2pdf-macos-x64`, `jpg2pdf-macos-arm64`.
+`jpg2pdf-linux-arm64`.
 
 ---
 

@@ -43,7 +43,7 @@ on_signal() { warn "Installer interrupted safely before completion."; exit 1; }
 trap on_exit 0
 trap on_signal HUP INT TERM
 
-set -eu
+main() {
 
 if [ "$DEBUG" = "1" ]; then
   info "Debug mode enabled. Log: ${LOG_FILE:-<unavailable>}"
@@ -291,3 +291,8 @@ esac
 info "Done. Try:"
 printf '    jpg2pdf ~/Pictures --size a4\n'
 printf '    jpg2pdf . --size a4 --style pencil\n'
+}
+
+if ! ( set -eu; main "$@" ); then
+  die "Installer failed safely before completion. Re-run with --debug for details."
+fi

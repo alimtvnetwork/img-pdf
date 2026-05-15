@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # One-liner installer for jpg2pdf on Linux & macOS.
 #
 # Usage:
@@ -17,6 +17,13 @@
 #   4. If no binary exists, falls back to a Python source install.
 #   5. Installs into $JPG2PDF_PREFIX (default $HOME/.local/bin), chmod +x, and reports next steps.
 
+set -eo pipefail
+
+PWD_SAFE="$(pwd 2>/dev/null || printf /tmp)"
+TMP_DIR="${TMPDIR:-/tmp}"
+if [ ! -d "$TMP_DIR" ]; then TMP_DIR="/tmp"; fi
+if [ ! -d "$TMP_DIR" ]; then TMP_DIR="$PWD_SAFE"; fi
+HOME_DIR="${HOME:-$PWD_SAFE}"
 DEBUG="${JPG2PDF_DEBUG:-0}"
 for _arg in "$@"; do
   case "$_arg" in
@@ -24,9 +31,9 @@ for _arg in "$@"; do
   esac
 done
 
-LOG_FILE="${JPG2PDF_LOG:-${TMPDIR:-/tmp}/jpg2pdf-install-$(date +%Y%m%d-%H%M%S)-$$.log}"
+LOG_FILE="${JPG2PDF_LOG:-$TMP_DIR/jpg2pdf-install-$(date +%Y%m%d-%H%M%S)-$$.log}"
 : > "$LOG_FILE" 2>/dev/null || LOG_FILE=""
-SAFE_DIE_MARKER="${TMPDIR:-/tmp}/jpg2pdf-install-die-$$.flag"
+SAFE_DIE_MARKER="$TMP_DIR/jpg2pdf-install-die-$$.flag"
 rm -f "$SAFE_DIE_MARKER" 2>/dev/null || true
 
 _log() { [ -n "$LOG_FILE" ] && printf '%s %s\n' "$(date +%H:%M:%S)" "$*" >> "$LOG_FILE" 2>/dev/null || true; }
@@ -84,14 +91,17 @@ if [ "$DEBUG" = "1" ]; then
   debug "uname: $(uname -a 2>/dev/null || echo unknown)"
   debug "shell: ${SHELL:-unknown}  user: $(id -un 2>/dev/null || echo unknown)"
   debug "PATH: ${PATH:-}"
+  if [ -n "$LOG_FILE" ]; then
+    exec 9>>"$LOG_FILE" 2>/dev/null || true
+    BASH_XTRACEFD=9
+  fi
   set -x
 fi
 
-DEFAULT_PREFIX="${HOME:-}/.local/bin"
+DEFAULT_PREFIX="$HOME_DIR/.local/bin"
 if [ -z "${HOME:-}" ] && [ -z "${JPG2PDF_PREFIX:-}" ]; then
-  DEFAULT_PREFIX="/usr/local/bin"
+  DEFAULT_PREFIX="$PWD_SAFE/.local/bin"
 fi
-HOME_DIR="${HOME:-}"
 REPO="${JPG2PDF_REPO:-alimtvnetwork/img-pdf}"
 VERSION="${JPG2PDF_VERSION:-}"
 PREFIX="${JPG2PDF_PREFIX:-$DEFAULT_PREFIX}"
@@ -101,8 +111,8 @@ if [ -z "$REPO" ]; then
   die "Set the repo: JPG2PDF_REPO=your-user/your-repo curl ... | sh"
 fi
 
-uname_s="$(uname -s)"
-uname_m="$(uname -m)"
+if ! uname_s="$(uname -s 2>/dev/null)"; then add_crash_report "uname -s" "Platform detection" "unsupported OS" "uname failed"; die "Could not detect OS."; fi
+if ! uname_m="$(uname -m 2>/dev/null)"; then add_crash_report "uname -m" "Platform detection" "unsupported arch" "uname failed"; die "Could not detect architecture."; fi
 case "$uname_s" in
   Linux)  os=linux  ;;
   Darwin) os=macos  ;;
@@ -156,7 +166,7 @@ fi
 try_get() {
   tg_desc="$1"
   tg_url="$2"
-  tg_err_file="${TMPDIR:-/tmp}/jpg2pdf-installer-get-$$.err"
+  tg_err_file="$TMP_DIR/jpg2pdf-installer-get-$$.err"
   if tg_body="$(GET "$tg_url" 2>"$tg_err_file")"; then
     rm -f "$tg_err_file"
     printf '%s' "$tg_body"
@@ -237,7 +247,7 @@ download_main_artifact() {
     archive_url="$(printf '%s' "$artifact_line" | json_value archive_download_url)"
     [ -n "$archive_url" ] || continue
 
-    tmp_base="${TMPDIR:-/tmp}"
+    tmp_base="$TMP_DIR"
     tmp_root="$tmp_base/jpg2pdf-artifact-$$"
     zip_file="$tmp_root/artifact.zip"
     extract_dir="$tmp_root/unzipped"
@@ -284,7 +294,7 @@ install_source_from_ref() {
     return 1
   fi
 
-  tmp_base="${TMPDIR:-/tmp}"
+  tmp_base="$TMP_DIR"
   tmp_root="$tmp_base/jpg2pdf-source-$$"
   tar_file="$tmp_root/source.tar.gz"
   extract_dir="$tmp_root/extracted"

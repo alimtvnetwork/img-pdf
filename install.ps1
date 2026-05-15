@@ -115,8 +115,9 @@ try {
         return $false
     }
 
-    $asset   = "jpg2pdf-windows-x64.exe"
-    $binDir  = Join-Path $HOME "Tools\bin"
+    $asset = "jpg2pdf-windows-x64.exe"
+    $homeDir = $(if ($HOME) { $HOME } elseif ($env:USERPROFILE) { $env:USERPROFILE } else { (Get-Location).Path })
+    $binDir  = Join-Path $homeDir "Tools\bin"
     $exePath = Join-Path $binDir "jpg2pdf.exe"
     New-Item -ItemType Directory -Force -Path $binDir | Out-Null
 
@@ -177,7 +178,7 @@ try {
     if (-not $NoContextMenu) {
         $ctxRef = $(if ($Version) { $Version } else { "main" })
         $ctxUrl  = "https://raw.githubusercontent.com/$Repo/$ctxRef/tools/jpg2pdf/scripts/register-context-menu.ps1"
-        $ctxFile = Join-Path $env:TEMP "jpg2pdf-register-context-menu.ps1"
+        $ctxFile = Join-Path (Get-SafeTempDir) "jpg2pdf-register-context-menu.ps1"
         try {
             Info "Fetching context-menu registrar from $ctxUrl"
             Invoke-WebRequest -Headers $headers -Uri $ctxUrl -OutFile $ctxFile -UseBasicParsing

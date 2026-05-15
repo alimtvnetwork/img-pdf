@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 from PIL import Image, ImageChops, ImageEnhance, ImageFilter, ImageOps
 
-__version__ = "0.12.2"
+__version__ = "1.1.0"
 
 # Pencil presets — tuned for faint handwritten text.
 # Module-scope so prompt_pencil_strength() can render the live preview with
@@ -103,7 +103,7 @@ def format_pdf_name(pattern: str, *, folder_name: str, first_image: Path,
 
 
 
-def prompt_pencil_strength(default: str = "normal", sample_path=None) -> str:
+def prompt_pencil_strength(default: str = "subtle", sample_path=None) -> str:
     """Show a Tk dropdown to pick pencil strength, with a LIVE preview.
 
     When `sample_path` points to a real image, a thumbnail of that image is
@@ -130,8 +130,8 @@ def prompt_pencil_strength(default: str = "normal", sample_path=None) -> str:
 
     choices = ["subtle", "normal", "extra"]
     descriptions = {
-        "subtle": "Subtle  — gentle, keeps paper texture",
-        "normal": "Normal  — balanced (default)",
+        "subtle": "Subtle  — gentle, keeps paper texture (default)",
+        "normal": "Normal  — balanced ink + paper grain",
         "extra":  "Extra visible — aggressive darkening for very faint pencil",
     }
     result = {"value": default}
@@ -728,11 +728,11 @@ def main():
     ap.add_argument("--pencil-strength",
                     choices=["subtle", "normal", "extra"], default=None,
                     help="Pencil preset for faint text: "
-                         "'subtle' (gentle, keeps paper texture), "
-                         "'normal' (default, balanced), "
+                         "'subtle' (default, gentle, keeps paper texture), "
+                         "'normal' (balanced ink + paper grain), "
                          "'extra' (extra-visible — aggressive darkening for very faint pencil). "
                          "Defaults to your last chosen value (saved in "
-                         "~/.jpg2pdf/config.json), or 'normal' on first run. "
+                         "~/.jpg2pdf/config.json), or 'subtle' on first run. "
                          "Individual --pencil-* flags override the preset.")
     ap.add_argument("--pencil-opacity", type=float, default=None,
                     help="Pencil style: how much non-ink survives (0..1, default 0.25). "
@@ -772,9 +772,9 @@ def main():
     # Seed default from saved prefs (CLI value always wins).
     cli_strength_explicit = args.pencil_strength is not None
     if not cli_strength_explicit:
-        args.pencil_strength = prefs.get("pencil_strength", "normal")
+        args.pencil_strength = prefs.get("pencil_strength", "subtle")
         if args.pencil_strength not in PENCIL_PRESETS:
-            args.pencil_strength = "normal"
+            args.pencil_strength = "subtle"
 
     # ---- Resolve input mode (BEFORE the strength picker so we can pass a
     # real sample image into the live preview) ----

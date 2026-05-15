@@ -4,6 +4,15 @@ All notable changes to `jpg2pdf` are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.9] - 2026-05-15
+
+### Fixed
+- Windows installer: added safe wrappers around the remaining filesystem, archive, path-resolution, download, and context-menu execution reads so failures are caught before they can crash the shell.
+- The release download path still falls back to the latest successful `main`-branch artifact when no release or release asset is usable.
+
+### Changed
+- Root and tool README pinned-version install snippets now reference `v1.2.9`.
+
 ## [1.2.8] - 2026-05-15
 
 ### Fixed

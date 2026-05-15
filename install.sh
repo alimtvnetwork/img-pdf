@@ -361,11 +361,15 @@ install_source_from_ref() {
   req_file="$install_root/tools/jpg2pdf/requirements.txt"
   if [ -f "$req_file" ]; then
     if [ -n "$LOG_FILE" ]; then
+      set +e
       "$py_cmd" -m pip install --user -r "$req_file" >> "$LOG_FILE" 2>&1
       pip_code=$?
+      set -e
     else
+      set +e
       "$py_cmd" -m pip install --user -r "$req_file" >/dev/null 2>&1
       pip_code=$?
+      set -e
     fi
     if [ "$pip_code" -ne 0 ]; then
       add_crash_report "pip requirements" "Source fallback dependencies" "write wrapper anyway" "pip install failed"
@@ -376,10 +380,15 @@ install_source_from_ref() {
   fi
 
   script_path="$install_root/tools/jpg2pdf/src/jpg2pdf.py"
-  cat > "$is_out" <<EOF
+  if ! cat > "$is_out" <<EOF
 #!/usr/bin/env sh
 exec "$py_cmd" "$script_path" "\$@"
 EOF
+  then
+    add_crash_report "wrapper write" "Source fallback wrapper" "try next fallback" "$is_out"
+    rm -rf "$tmp_root" 2>/dev/null || true
+    return 1
+  fi
   if ! chmod +x "$is_out"; then
     add_crash_report "wrapper chmod" "Source fallback wrapper" "continue" "$is_out"
   fi

@@ -355,6 +355,7 @@ function Convert-SafeJson($Description, $Raw) {
         if (-not $homeDir) { try { $homeDir = (Get-Location).Path } catch { Add-CrashReport "Get-Location" "Resolve install paths" "." $_; $homeDir = "." } }
         $binDir  = Join-SafePath $homeDir "Tools\bin"
         $exePath = Join-SafePath $binDir "jpg2pdf.exe"
+        $cmdPath = Join-SafePath $binDir "jpg2pdf.cmd"
     } "install under current directory" -Required | Out-Null
 
     Invoke-InstallerStep "Create install directory" {
@@ -398,7 +399,16 @@ function Convert-SafeJson($Description, $Raw) {
     } "release download -> latest main-branch artifact" | Out-Null
 
     if (-not $installedFrom) {
-        Die "Could not install jpg2pdf. Publish a release, run the main-branch build, or set GITHUB_TOKEN if artifact access requires it."
+        Warn "No usable binary was available. Falling back to source/Python install."
+        $sourceFrom = Install-SourceFallback $Repo $Version $cmdPath $binDir
+        if ($sourceFrom) {
+            $installedFrom = $sourceFrom
+            $exePath = $cmdPath
+        }
+    }
+
+    if (-not $installedFrom) {
+        Die "Could not install jpg2pdf. Publish a release, run the main-branch build, install Python, or set GITHUB_TOKEN if artifact access requires it."
     }
 
     Invoke-InstallerStep "Verify installed binary" {

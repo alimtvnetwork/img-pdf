@@ -55,7 +55,7 @@ and registers the Explorer right-click entries. Open a new terminal afterwards.
 ### 🪟 Windows · PowerShell · pin a specific version
 
 ```powershell
-$env:JPG2PDF_VERSION = "v1.1.0"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
+$env:JPG2PDF_VERSION = "v1.2.0"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 ```
 
 ### 🐧 macOS · Linux · Bash
@@ -70,7 +70,7 @@ Drops `jpg2pdf` into `~/.local/bin` (override with `JPG2PDF_PREFIX=$HOME/bin`).
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh \
-  | JPG2PDF_VERSION=v1.1.0 JPG2PDF_PREFIX=$HOME/bin bash
+  | JPG2PDF_VERSION=v1.2.0 JPG2PDF_PREFIX=$HOME/bin bash
 ```
 
 If PowerShell blocks scripts, use a process-only bypass for the current shell first:
@@ -193,7 +193,7 @@ Tag & push — GitHub Actions builds binaries for Windows / Linux / macOS
 (x64 + Apple Silicon) and publishes a Release with `SHA256SUMS.txt`:
 
 ```bash
-git tag v1.1.0 && git push origin v1.1.0
+git tag v1.2.0 && git push origin v1.2.0
 ```
 
 Released artifacts: `jpg2pdf-windows-x64.exe`, `jpg2pdf-linux-x64`,

@@ -1,0 +1,17 @@
+{
+  "version": "1.2.2",
+  "branch": "release/v1.2.2",
+  "sourceBranch": "main",
+  "commit": "6a1f35fd5a7960cd348be5832a5ec393afd138cf",
+  "tag": "v1.2.2",
+  "assets": [],
+  "changelog": [
+    "Windows installer: wrapped the whole install flow and every GitHub read/download in safe try/catch handling so failures report cleanly instead of crashing the PowerShell session.",
+    "Installers now fall back to the latest successful `main`-branch workflow artifact when no GitHub Release is available or the release asset download fails.",
+    "Root and tool README pinned-version install snippets now reference `v1.2.2`."
+  ],
+  "isDraft": false,
+  "isPreRelease": false,
+  "createdAt": "2026-05-15T04:21:21Z",
+  "isLatest": false
+}

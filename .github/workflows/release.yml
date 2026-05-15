@@ -121,6 +121,66 @@ jobs:
       - name: List artifacts
         run: ls -la dist
 
+      - name: Extract changelog section
+        id: changelog
+        shell: bash
+        run: |
+          TAG="${{ steps.tag.outputs.name }}"
+          VERSION="${TAG#v}"
+          BODY=""
+          if [ -f CHANGELOG.md ]; then
+            BODY=$(awk -v ver="$VERSION" '
+              $0 ~ "^## \\[" ver "\\]" { capture=1; next }
+              capture && /^## \[/ { exit }
+              capture { print }
+            ' CHANGELOG.md)
+          fi
+          if [ -z "${BODY// }" ]; then
+            BODY="No changelog entry found for ${TAG}."
+          fi
+          {
+            echo "body<<CHANGELOG_EOF"
+            echo "$BODY"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Render release notes
+        shell: bash
+        run: |
+          TAG="${{ steps.tag.outputs.name }}"
+          COMMIT_FULL="${{ github.sha }}"
+          COMMIT_SHORT="${COMMIT_FULL:0:10}"
+          BUILD_DATE_UTC="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          PYTHON_VERSION="3.12"
+          BRANCH="release/${TAG}"
+          REPO="${{ github.repository }}"
+          CHECKSUMS="$(cat dist/SHA256SUMS.txt)"
+
+          export TAG COMMIT_FULL COMMIT_SHORT BUILD_DATE_UTC PYTHON_VERSION BRANCH REPO CHECKSUMS
+          export CHANGELOG=${{ toJSON(steps.changelog.outputs.body) }}
+
+          python3 - <<'PY' > dist/RELEASE_NOTES.md
+          import os, pathlib
+          tpl = pathlib.Path(".github/release-notes-template.md").read_text()
+          mapping = {
+              "VERSION": os.environ["TAG"],
+              "COMMIT_FULL": os.environ["COMMIT_FULL"],
+              "COMMIT_SHORT": os.environ["COMMIT_SHORT"],
+              "BRANCH": os.environ["BRANCH"],
+              "BUILD_DATE_UTC": os.environ["BUILD_DATE_UTC"],
+              "PYTHON_VERSION": os.environ["PYTHON_VERSION"],
+              "REPO": os.environ["REPO"],
+              "CHECKSUMS": os.environ["CHECKSUMS"],
+              "CHANGELOG": os.environ["CHANGELOG"],
+          }
+          for k, v in mapping.items():
+              tpl = tpl.replace("{{" + k + "}}", v)
+          print(tpl, end="")
+          PY
+
+          echo "----- rendered release notes -----"
+          cat dist/RELEASE_NOTES.md
+
       - name: Create / update GitHub Release
         uses: softprops/action-gh-release@v2
         with:

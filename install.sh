@@ -34,6 +34,7 @@ info() { _log "INFO  $*"; printf '\033[36m[jpg2pdf]\033[0m %s\n' "$*"; }
 warn() { _log "WARN  $*"; printf '\033[33m[jpg2pdf]\033[0m %s\n' "$*" >&2; }
 debug(){ _log "DEBUG $*"; [ "$DEBUG" = "1" ] && printf '\033[35m[jpg2pdf:debug]\033[0m %s\n' "$*" >&2 || true; }
 die()  { _log "ERROR $*"; : > "$SAFE_DIE_MARKER" 2>/dev/null || true; printf '\033[31m[jpg2pdf]\033[0m %s\n' "$*" >&2; [ -n "$LOG_FILE" ] && printf '\033[31m[jpg2pdf]\033[0m Full log: %s\n' "$LOG_FILE" >&2; exit 1; }
+safe_read_file() { sed -n '1,$p' "$1" 2>/dev/null || true; }
 on_exit() {
   code=$?
   if [ "$code" -ne 0 ]; then
@@ -130,7 +131,7 @@ try_get() {
     printf '%s' "$tg_body"
     return 0
   fi
-  tg_err="$(cat "$tg_err_file" 2>/dev/null || true)"
+  tg_err="$(safe_read_file "$tg_err_file")"
   rm -f "$tg_err_file"
   warn "$tg_desc failed: $tg_err"
   return 1

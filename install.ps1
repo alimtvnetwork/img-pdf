@@ -18,7 +18,7 @@
   4. Adds that folder to your User PATH (persistent, no admin).
   5. Downloads + runs register-context-menu.ps1 from the same tag or main (unless disabled).
 #>
-try { $ErrorActionPreference = "Stop" } catch { }
+try { $ErrorActionPreference = "Continue" } catch { }
 
 function Stop-Safely($Message) {
     try { Write-Host "[jpg2pdf] $Message" -ForegroundColor Red } catch { }
@@ -134,13 +134,20 @@ function Write-CrashReportSection($Reason) {
 function Info($m)  { Write-Log "INFO " $m; Write-Host "[jpg2pdf] $m" -ForegroundColor Cyan }
 function Warn($m)  { Write-Log "WARN " $m; Write-Host "[jpg2pdf] $m" -ForegroundColor Yellow }
 function Debug2($m){ Write-Log "DEBUG" $m; if ($script:DebugMode) { Write-Host "[jpg2pdf:debug] $m" -ForegroundColor Magenta } }
-function Die ($m)  {
+    function Die ($m)  {
     Write-CrashReportSection $m
     Write-Log "ERROR" $m
     Write-Host "[jpg2pdf] $m" -ForegroundColor Red
     if ($script:LogFile) { Write-Host "[jpg2pdf] Full log: $script:LogFile" -ForegroundColor Red }
     exit 1
 }
+    function Log-ExternalOutput($Level, $Lines) {
+        try {
+            foreach ($line in @($Lines)) {
+                if ($null -ne $line -and [string]$line -ne "") { Write-Log $Level ([string]$line) }
+            }
+        } catch { }
+    }
 
 function Invoke-Safe($Description, [scriptblock]$Action, $Default = $null) {
     try { return & $Action } catch { Add-CrashReport $Description $Description "default: $Default" $_; Warn "$Description failed safely: $_"; return $Default }

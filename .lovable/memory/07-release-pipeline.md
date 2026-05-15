@@ -18,6 +18,8 @@ Only `v*` tag pushes and manual release runs publish a GitHub Release with all a
 
 `install.ps1` must wrap the whole flow plus every GitHub read/download in try/catch-style handling. Missing releases or missing release assets must not crash the installer. If no release is available, or the release asset download fails, both installers must fall back to the latest successful `main`-branch workflow artifact for the current OS/arch. If no binary artifact exists (especially macOS while macOS runners are disabled), installers must fall back again to a Python source install from the pinned tag or `main`, write a `jpg2pdf` wrapper, and log every failed variable/step plus the fallback used.
 
+Use the defensive installer pattern from `alimtvnetwork/coding-guidelines-v20/install.ps1`: top-level trap/handler, master guarded body, every step wrapped, no raw crashes, and a final verbose-log crash report section. Be careful that PowerShell step wrappers must not hide later-needed variables in child scope; installer state should be script-scoped or assigned outside guarded scriptblocks.
+
 ## macOS quarantine
 
 Binaries are ad-hoc signed. The `install.sh` auto-strips `com.apple.quarantine`. Manual `.zip` downloads need:

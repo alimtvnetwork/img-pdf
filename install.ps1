@@ -285,47 +285,54 @@ function Convert-SafeJson($Description, $Raw) {
         return $false
     }
 
-    $asset = "jpg2pdf-windows-x64.exe"
-    $homeDir = Get-SafeEnv "USERPROFILE"
-    if (-not $homeDir) { try { if ($HOME) { $homeDir = [string]$HOME } } catch { } }
-    if (-not $homeDir) { try { $homeDir = (Get-Location).Path } catch { $homeDir = "." } }
-    $binDir  = Join-SafePath $homeDir "Tools\bin"
-    $exePath = Join-SafePath $binDir "jpg2pdf.exe"
-    if (-not (Invoke-SafeBool "Install directory creation" { New-Item -ItemType Directory -Force -Path $binDir -ErrorAction Stop | Out-Null })) {
-        Die "Could not create install directory safely."
-    }
+    Invoke-InstallerStep "Resolve install paths" {
+        $asset = "jpg2pdf-windows-x64.exe"
+        $homeDir = Get-SafeEnv "USERPROFILE"
+        if (-not $homeDir) { try { if ($HOME) { $homeDir = [string]$HOME } } catch { Add-CrashReport "HOME" "Resolve install paths" "current directory" $_ } }
+        if (-not $homeDir) { try { $homeDir = (Get-Location).Path } catch { Add-CrashReport "Get-Location" "Resolve install paths" "." $_; $homeDir = "." } }
+        $binDir  = Join-SafePath $homeDir "Tools\bin"
+        $exePath = Join-SafePath $binDir "jpg2pdf.exe"
+    } "install under current directory" -Required | Out-Null
+
+    Invoke-InstallerStep "Create install directory" {
+        if (-not (Invoke-SafeBool "Install directory creation" { New-Item -ItemType Directory -Force -Path $binDir -ErrorAction Stop | Out-Null })) {
+            Die "Could not create install directory safely."
+        }
+    } "abort install" -Required | Out-Null
 
     $installedFrom = $null
-    if ($Version) {
-        Info "Installing jpg2pdf $Version"
-        if (Download-ReleaseAsset $Repo $Version $asset $exePath) { $installedFrom = "release $Version" }
-        if (-not $installedFrom) {
-            Add-CrashReport "release asset:$asset" "version-pinned install" "latest main-branch artifact" "release asset unavailable"
-            Warn "Release asset was not available. Falling back to the latest successful main-branch artifact."
-            if (Download-MainArtifact $Repo $asset $exePath) {
-                $installedFrom = "latest main-branch artifact"
-                $Version = ""
-            }
-        }
-    } else {
-        Info "Resolving latest release of $Repo ..."
-        $rel = Get-GitHubJson "https://api.github.com/repos/$Repo/releases/latest" "Latest release lookup"
-        if ($rel -and $rel.tag_name) {
-            $Version = $rel.tag_name
+    Invoke-InstallerStep "Download installer binary" {
+        if ($Version) {
             Info "Installing jpg2pdf $Version"
             if (Download-ReleaseAsset $Repo $Version $asset $exePath) { $installedFrom = "release $Version" }
-            if (-not $installedFrom) { Add-CrashReport "release asset:$asset" "latest-release install" "latest main-branch artifact" "release asset unavailable" }
+            if (-not $installedFrom) {
+                Add-CrashReport "release asset:$asset" "version-pinned install" "latest main-branch artifact" "release asset unavailable"
+                Warn "Release asset was not available. Falling back to the latest successful main-branch artifact."
+                if (Download-MainArtifact $Repo $asset $exePath) {
+                    $installedFrom = "latest main-branch artifact"
+                    $Version = ""
+                }
+            }
         } else {
-            Add-CrashReport "latest release" "release resolution" "latest main-branch artifact" "no GitHub Release found"
-            Warn "No GitHub Release found. Falling back to the latest successful main-branch artifact."
-        }
+            Info "Resolving latest release of $Repo ..."
+            $rel = Get-GitHubJson "https://api.github.com/repos/$Repo/releases/latest" "Latest release lookup"
+            if ($rel -and $rel.tag_name) {
+                $Version = $rel.tag_name
+                Info "Installing jpg2pdf $Version"
+                if (Download-ReleaseAsset $Repo $Version $asset $exePath) { $installedFrom = "release $Version" }
+                if (-not $installedFrom) { Add-CrashReport "release asset:$asset" "latest-release install" "latest main-branch artifact" "release asset unavailable" }
+            } else {
+                Add-CrashReport "latest release" "release resolution" "latest main-branch artifact" "no GitHub Release found"
+                Warn "No GitHub Release found. Falling back to the latest successful main-branch artifact."
+            }
 
-        if (-not $installedFrom) {
-            if (Download-MainArtifact $Repo $asset $exePath) {
-                $installedFrom = "latest main-branch artifact"
+            if (-not $installedFrom) {
+                if (Download-MainArtifact $Repo $asset $exePath) {
+                    $installedFrom = "latest main-branch artifact"
+                }
             }
         }
-    }
+    } "release download -> latest main-branch artifact" | Out-Null
 
     if (-not $installedFrom) {
         Die "Could not install jpg2pdf. Publish a release, run the main-branch build, or set GITHUB_TOKEN if artifact access requires it."

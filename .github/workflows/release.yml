@@ -271,8 +271,6 @@ jobs:
             dist/jpg2pdf-windows-x64.exe
             dist/jpg2pdf-linux-x64
             dist/jpg2pdf-linux-arm64
-            dist/jpg2pdf-macos-x64
-            dist/jpg2pdf-macos-arm64
             dist/SHA256SUMS.txt
             dist/install.ps1
             dist/install.sh

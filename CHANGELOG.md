@@ -4,6 +4,16 @@ All notable changes to `jpg2pdf` are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.7] - 2026-05-15
+
+### Fixed
+- Windows installer: removed the advanced `param` binding block so `irm ... | iex` cannot crash before installer-owned safe handling starts; arguments are now parsed inside the top-level guarded block.
+- macOS/Linux installer: moved strict-mode execution inside a guarded `main` wrapper so unexpected startup reads fail through the safe error path instead of aborting the shell.
+- Release lookup and pinned-release download still fall back to the latest successful `main`-branch workflow artifact when no usable release asset exists.
+
+### Changed
+- Root and tool README pinned-version install snippets now reference `v1.2.7`.
+
 ## [1.2.6] - 2026-05-15
 
 ### Added

@@ -5,7 +5,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | sh
 #
 #   # Pin a specific version:
-#   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | JPG2PDF_VERSION=v1.2.6 sh
+#   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | JPG2PDF_VERSION=v1.2.7 sh
 #
 #   # Install elsewhere (default: $HOME/.local/bin):
 #   curl -fsSL https://.../install.sh | JPG2PDF_PREFIX=$HOME/bin sh
@@ -26,12 +26,14 @@ done
 
 LOG_FILE="${JPG2PDF_LOG:-${TMPDIR:-/tmp}/jpg2pdf-install-$(date +%Y%m%d-%H%M%S)-$$.log}"
 : > "$LOG_FILE" 2>/dev/null || LOG_FILE=""
+SAFE_DIE_MARKER="${TMPDIR:-/tmp}/jpg2pdf-install-die-$$.flag"
+rm -f "$SAFE_DIE_MARKER" 2>/dev/null || true
 
 _log() { [ -n "$LOG_FILE" ] && printf '%s %s\n' "$(date +%H:%M:%S)" "$*" >> "$LOG_FILE" 2>/dev/null || true; }
 info() { _log "INFO  $*"; printf '\033[36m[jpg2pdf]\033[0m %s\n' "$*"; }
 warn() { _log "WARN  $*"; printf '\033[33m[jpg2pdf]\033[0m %s\n' "$*" >&2; }
 debug(){ _log "DEBUG $*"; [ "$DEBUG" = "1" ] && printf '\033[35m[jpg2pdf:debug]\033[0m %s\n' "$*" >&2 || true; }
-die()  { _log "ERROR $*"; printf '\033[31m[jpg2pdf]\033[0m %s\n' "$*" >&2; [ -n "$LOG_FILE" ] && printf '\033[31m[jpg2pdf]\033[0m Full log: %s\n' "$LOG_FILE" >&2; exit 1; }
+die()  { _log "ERROR $*"; : > "$SAFE_DIE_MARKER" 2>/dev/null || true; printf '\033[31m[jpg2pdf]\033[0m %s\n' "$*" >&2; [ -n "$LOG_FILE" ] && printf '\033[31m[jpg2pdf]\033[0m Full log: %s\n' "$LOG_FILE" >&2; exit 1; }
 on_exit() {
   code=$?
   if [ "$code" -ne 0 ]; then
@@ -43,7 +45,7 @@ on_signal() { warn "Installer interrupted safely before completion."; exit 1; }
 trap on_exit 0
 trap on_signal HUP INT TERM
 
-set -eu
+main() {
 
 if [ "$DEBUG" = "1" ]; then
   info "Debug mode enabled. Log: ${LOG_FILE:-<unavailable>}"
@@ -120,28 +122,28 @@ else
 fi
 
 try_get() {
-  desc="$1"
-  url="$2"
-  err_file="${TMPDIR:-/tmp}/jpg2pdf-installer-get-$$.err"
-  if out="$(GET "$url" 2>"$err_file")"; then
-    rm -f "$err_file"
-    printf '%s' "$out"
+  tg_desc="$1"
+  tg_url="$2"
+  tg_err_file="${TMPDIR:-/tmp}/jpg2pdf-installer-get-$$.err"
+  if tg_body="$(GET "$tg_url" 2>"$tg_err_file")"; then
+    rm -f "$tg_err_file"
+    printf '%s' "$tg_body"
     return 0
   fi
-  err="$(cat "$err_file" 2>/dev/null || true)"
-  rm -f "$err_file"
-  warn "$desc failed: $err"
+  tg_err="$(cat "$tg_err_file" 2>/dev/null || true)"
+  rm -f "$tg_err_file"
+  warn "$tg_desc failed: $tg_err"
   return 1
 }
 
 try_download() {
-  desc="$1"
-  url="$2"
-  out="$3"
-  if DL "$url" "$out"; then
+  td_desc="$1"
+  td_url="$2"
+  td_dest="$3"
+  if DL "$td_url" "$td_dest"; then
     return 0
   fi
-  warn "$desc failed: $url"
+  warn "$td_desc failed: $td_url"
   return 1
 }
 
@@ -195,7 +197,8 @@ download_main_artifact() {
     archive_url="$(printf '%s' "$artifact_line" | json_value archive_download_url)"
     [ -n "$archive_url" ] || continue
 
-    tmp_root="${TMPDIR:-/tmp}/jpg2pdf-artifact-$$"
+    tmp_base="${TMPDIR:-/tmp}"
+    tmp_root="$tmp_base/jpg2pdf-artifact-$$"
     zip_file="$tmp_root/artifact.zip"
     extract_dir="$tmp_root/unzipped"
     rm -rf "$tmp_root"
@@ -291,3 +294,12 @@ esac
 info "Done. Try:"
 printf '    jpg2pdf ~/Pictures --size a4\n'
 printf '    jpg2pdf . --size a4 --style pencil\n'
+}
+
+if ! ( set -eu; main "$@" ); then
+  if [ -f "$SAFE_DIE_MARKER" ]; then
+    rm -f "$SAFE_DIE_MARKER" 2>/dev/null || true
+    exit 1
+  fi
+  die "Installer failed safely before completion. Re-run with --debug for details."
+fi

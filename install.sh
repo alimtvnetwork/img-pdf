@@ -150,8 +150,7 @@ download_main_artifact() {
   out="$1"
   info "Looking for latest main-branch artifact named $asset ..."
   runs_json="$(try_get "Main-branch workflow lookup" "$GITHUB_API/repos/$REPO/actions/workflows/release.yml/runs?branch=main&status=success&per_page=10")" || return 1
-  artifacts_urls="$(printf '%s' "$runs_json" | sed 's/"artifacts_url"/\
-"artifacts_url"/g' | sed -n 's/.*"artifacts_url":[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 10)"
+  artifacts_urls="$(printf '%s' "$runs_json" | grep -o '"artifacts_url"[[:space:]]*:[[:space:]]*"[^"]*"' | sed -n 's/.*"artifacts_url":[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 10)"
   [ -n "$artifacts_urls" ] || return 1
 
   for artifacts_url in $artifacts_urls; do

@@ -275,9 +275,11 @@ download_main_artifact() {
           candidate="$(find "$extract_dir" -type f -name "$asset" 2>/dev/null | head -n 1 || true)"
         fi
         if [ -n "$candidate" ] && [ -f "$candidate" ]; then
-          cp "$candidate" "$out"
-          rm -rf "$tmp_root"
-          return 0
+          if cp "$candidate" "$out"; then
+            rm -rf "$tmp_root"
+            return 0
+          fi
+          add_crash_report "artifact copy" "Main-branch artifact install" "try next fallback" "$candidate -> $out"
         fi
         warn "Artifact archive did not contain $asset."
       else

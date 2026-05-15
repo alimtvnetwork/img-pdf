@@ -5,7 +5,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | sh
 #
 #   # Pin a specific version:
-#   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | JPG2PDF_VERSION=v1.2.3 sh
+#   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | JPG2PDF_VERSION=v1.2.4 sh
 #
 #   # Install elsewhere (default: $HOME/.local/bin):
 #   curl -fsSL https://.../install.sh | JPG2PDF_PREFIX=$HOME/bin sh
@@ -31,6 +31,7 @@ DEFAULT_PREFIX="${HOME:-}/.local/bin"
 if [ -z "${HOME:-}" ] && [ -z "${JPG2PDF_PREFIX:-}" ]; then
   DEFAULT_PREFIX="/usr/local/bin"
 fi
+HOME_DIR="${HOME:-}"
 REPO="${JPG2PDF_REPO:-alimtvnetwork/img-pdf}"
 VERSION="${JPG2PDF_VERSION:-}"
 PREFIX="${JPG2PDF_PREFIX:-$DEFAULT_PREFIX}"
@@ -251,10 +252,11 @@ case ":$PATH:" in
   *":$PREFIX:"*) info "$PREFIX is already on PATH." ;;
   *)
     warn "$PREFIX is not on your PATH."
+    [ -n "$HOME_DIR" ] || HOME_DIR="$PREFIX"
     case "${SHELL:-}" in
-      */zsh)  rc="$HOME/.zshrc"  ;;
-      */bash) rc="$HOME/.bashrc" ;;
-      *)      rc="$HOME/.profile" ;;
+      */zsh)  rc="$HOME_DIR/.zshrc"  ;;
+      */bash) rc="$HOME_DIR/.bashrc" ;;
+      *)      rc="$HOME_DIR/.profile" ;;
     esac
     printf '       Add this line to %s :\n         export PATH="%s:$PATH"\n' "$rc" "$PREFIX"
     ;;

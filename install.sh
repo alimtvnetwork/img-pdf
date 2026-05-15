@@ -5,7 +5,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | sh
 #
 #   # Pin a specific version:
-#   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | JPG2PDF_VERSION=v1.3.4 sh
+#   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | JPG2PDF_VERSION=v1.3.5 sh
 #
 #   # Install elsewhere (default: $HOME/.local/bin):
 #   curl -fsSL https://.../install.sh | JPG2PDF_PREFIX=$HOME/bin sh
@@ -14,8 +14,8 @@
 #   1. Detects OS + arch.
 #   2. Resolves the latest GitHub Release (or $JPG2PDF_VERSION).
 #   3. If no release is available, falls back to the latest successful main-branch artifact.
-#   4. Downloads the matching binary into $JPG2PDF_PREFIX (default $HOME/.local/bin).
-#   5. chmod +x and reports next steps.
+#   4. If no binary exists, falls back to a Python source install.
+#   5. Installs into $JPG2PDF_PREFIX (default $HOME/.local/bin), chmod +x, and reports next steps.
 
 DEBUG="${JPG2PDF_DEBUG:-0}"
 for _arg in "$@"; do
@@ -33,11 +33,42 @@ _log() { [ -n "$LOG_FILE" ] && printf '%s %s\n' "$(date +%H:%M:%S)" "$*" >> "$LO
 info() { _log "INFO  $*"; printf '\033[36m[jpg2pdf]\033[0m %s\n' "$*"; }
 warn() { _log "WARN  $*"; printf '\033[33m[jpg2pdf]\033[0m %s\n' "$*" >&2; }
 debug(){ _log "DEBUG $*"; [ "$DEBUG" = "1" ] && printf '\033[35m[jpg2pdf:debug]\033[0m %s\n' "$*" >&2 || true; }
-die()  { _log "ERROR $*"; : > "$SAFE_DIE_MARKER" 2>/dev/null || true; printf '\033[31m[jpg2pdf]\033[0m %s\n' "$*" >&2; [ -n "$LOG_FILE" ] && printf '\033[31m[jpg2pdf]\033[0m Full log: %s\n' "$LOG_FILE" >&2; exit 1; }
+add_crash_report() {
+  cr_var="$1"
+  cr_where="$2"
+  cr_fallback="$3"
+  cr_error="$4"
+  _log "CRASH variable=$cr_var where=$cr_where fallback=$cr_fallback error=$cr_error"
+}
+write_crash_report_section() {
+  cr_reason="$1"
+  [ -n "$LOG_FILE" ] || return 0
+  {
+    printf '\n===== Installer crash report =====\n'
+    printf 'Reason: %s\n' "$cr_reason"
+    printf 'Recent guarded failures and fallbacks are listed as CRASH lines above.\n'
+    printf 'Last fallback: %s\n' "${LAST_FALLBACK:-none}"
+    printf '===== End installer crash report =====\n'
+  } >> "$LOG_FILE" 2>/dev/null || true
+}
+die()  { _log "ERROR $*"; add_crash_report "fatal" "die" "exit 1" "$*"; write_crash_report_section "$*"; : > "$SAFE_DIE_MARKER" 2>/dev/null || true; printf '\033[31m[jpg2pdf]\033[0m %s\n' "$*" >&2; [ -n "$LOG_FILE" ] && printf '\033[31m[jpg2pdf]\033[0m Full log: %s\n' "$LOG_FILE" >&2; exit 1; }
 safe_read_file() { sed -n '1,$p' "$1" 2>/dev/null || true; }
+run_step() {
+  rs_name="$1"
+  shift
+  debug "STEP $rs_name"
+  if "$@"; then
+    return 0
+  fi
+  rs_code=$?
+  add_crash_report "$rs_name" "$rs_name" "continue safely" "exit $rs_code"
+  warn "$rs_name failed safely (exit $rs_code)."
+  return "$rs_code"
+}
 on_exit() {
   code=$?
   if [ "$code" -ne 0 ]; then
+    write_crash_report_section "exit $code"
     warn "Installer failed safely before completion (exit $code)."
     [ -n "$LOG_FILE" ] && warn "Detailed log: $LOG_FILE"
   fi
@@ -133,6 +164,7 @@ try_get() {
   fi
   tg_err="$(safe_read_file "$tg_err_file")"
   rm -f "$tg_err_file"
+  add_crash_report "$tg_desc" "try_get" "continue to next fallback" "$tg_err"
   warn "$tg_desc failed: $tg_err"
   return 1
 }
@@ -144,6 +176,7 @@ try_download() {
   if DL "$td_url" "$td_dest"; then
     return 0
   fi
+  add_crash_report "$td_desc" "try_download" "continue to next fallback" "$td_url"
   warn "$td_desc failed: $td_url"
   return 1
 }
@@ -164,7 +197,10 @@ download_release_asset() {
 unpack_artifact() {
   zip_file="$1"
   extract_dir="$2"
-  mkdir -p "$extract_dir"
+  if ! mkdir -p "$extract_dir"; then
+    add_crash_report "extract_dir" "Artifact extraction setup" "try source fallback later" "$extract_dir"
+    return 1
+  fi
   if command -v unzip >/dev/null 2>&1; then
     unzip -q "$zip_file" -d "$extract_dir"
     return 0
@@ -189,7 +225,10 @@ download_main_artifact() {
   info "Looking for latest main-branch artifact named $asset ..."
   runs_json="$(try_get "Main-branch workflow lookup" "$GITHUB_API/repos/$REPO/actions/workflows/release.yml/runs?branch=main&status=success&per_page=10")" || return 1
   artifacts_urls="$(printf '%s' "$runs_json" | grep -o '"artifacts_url"[[:space:]]*:[[:space:]]*"[^"]*"' | sed -n 's/.*"artifacts_url":[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 10)"
-  [ -n "$artifacts_urls" ] || return 1
+  if [ -z "$artifacts_urls" ]; then
+    add_crash_report "artifacts_url" "Main-branch artifact lookup" "source/Python fallback" "no successful main runs with artifacts"
+    return 1
+  fi
 
   for artifacts_url in $artifacts_urls; do
     artifacts_json="$(try_get "Artifact lookup" "$artifacts_url?per_page=100")" || continue
@@ -203,7 +242,10 @@ download_main_artifact() {
     zip_file="$tmp_root/artifact.zip"
     extract_dir="$tmp_root/unzipped"
     rm -rf "$tmp_root"
-    mkdir -p "$tmp_root"
+    if ! mkdir -p "$tmp_root"; then
+      add_crash_report "artifact temp" "Main-branch artifact temp setup" "try next fallback" "$tmp_root"
+      continue
+    fi
     if try_download "Main-branch artifact download" "$archive_url" "$zip_file"; then
       if unpack_artifact "$zip_file" "$extract_dir"; then
         candidate="$extract_dir/$asset"
@@ -225,7 +267,123 @@ download_main_artifact() {
   return 1
 }
 
-mkdir -p "$PREFIX"
+
+find_python() {
+  if command -v python3 >/dev/null 2>&1; then printf '%s' "$(command -v python3)"; return 0; fi
+  if command -v python >/dev/null 2>&1; then printf '%s' "$(command -v python)"; return 0; fi
+  return 1
+}
+
+install_source_from_ref() {
+  is_ref="$1"
+  is_out="$2"
+  is_url_kind="$3"
+  py_cmd="$(find_python || true)"
+  if [ -z "$py_cmd" ]; then
+    add_crash_report "python" "Install source fallback" "binary-only install unavailable" "python3/python not found"
+    return 1
+  fi
+
+  tmp_base="${TMPDIR:-/tmp}"
+  tmp_root="$tmp_base/jpg2pdf-source-$$"
+  tar_file="$tmp_root/source.tar.gz"
+  extract_dir="$tmp_root/extracted"
+  rm -rf "$tmp_root" 2>/dev/null || true
+  if ! mkdir -p "$extract_dir"; then
+    add_crash_report "source temp" "Install source fallback" "try next fallback" "$tmp_root"
+    return 1
+  fi
+
+  if [ "$is_url_kind" = "tag" ]; then
+    src_url="https://github.com/$REPO/archive/refs/tags/$is_ref.tar.gz"
+  else
+    src_url="https://github.com/$REPO/archive/refs/heads/$is_ref.tar.gz"
+  fi
+  info "Downloading source fallback $src_url"
+  if ! try_download "Source fallback download" "$src_url" "$tar_file"; then
+    rm -rf "$tmp_root" 2>/dev/null || true
+    return 1
+  fi
+
+  if command -v tar >/dev/null 2>&1; then
+    if ! tar -xzf "$tar_file" -C "$extract_dir"; then
+      add_crash_report "source archive" "Source fallback extraction" "try next fallback" "$tar_file"
+      rm -rf "$tmp_root" 2>/dev/null || true
+      return 1
+    fi
+  else
+    add_crash_report "tar" "Source fallback extraction" "try next fallback" "tar not found"
+    rm -rf "$tmp_root" 2>/dev/null || true
+    return 1
+  fi
+
+  src_root="$(find "$extract_dir" -type f -path '*/tools/jpg2pdf/src/jpg2pdf.py' -print 2>/dev/null | sed 's#/tools/jpg2pdf/src/jpg2pdf.py$##' | head -n 1)"
+  if [ -z "$src_root" ]; then
+    add_crash_report "source tree" "Source fallback lookup" "try next fallback" "tools/jpg2pdf/src/jpg2pdf.py not found"
+    rm -rf "$tmp_root" 2>/dev/null || true
+    return 1
+  fi
+
+  install_root="$PREFIX/jpg2pdf-source"
+  if ! rm -rf "$install_root" 2>/dev/null; then
+    add_crash_report "install_root" "Source fallback cleanup" "overwrite in place" "$install_root"
+  fi
+  if ! cp -R "$src_root" "$install_root"; then
+    add_crash_report "source copy" "Source fallback install" "try next fallback" "$install_root"
+    rm -rf "$tmp_root" 2>/dev/null || true
+    return 1
+  fi
+
+  req_file="$install_root/tools/jpg2pdf/requirements.txt"
+  if [ -f "$req_file" ]; then
+    if [ -n "$LOG_FILE" ]; then
+      "$py_cmd" -m pip install --user -r "$req_file" >> "$LOG_FILE" 2>&1
+      pip_code=$?
+    else
+      "$py_cmd" -m pip install --user -r "$req_file" >/dev/null 2>&1
+      pip_code=$?
+    fi
+    if [ "$pip_code" -ne 0 ]; then
+      add_crash_report "pip requirements" "Source fallback dependencies" "write wrapper anyway" "pip install failed"
+      warn "Python dependency install failed; writing wrapper anyway. Check the log for pip output."
+    fi
+  else
+    add_crash_report "requirements.txt" "Source fallback dependencies" "write wrapper without pip" "requirements file missing"
+  fi
+
+  script_path="$install_root/tools/jpg2pdf/src/jpg2pdf.py"
+  cat > "$is_out" <<EOF
+#!/usr/bin/env sh
+exec "$py_cmd" "$script_path" "\$@"
+EOF
+  if ! chmod +x "$is_out"; then
+    add_crash_report "wrapper chmod" "Source fallback wrapper" "continue" "$is_out"
+  fi
+  rm -rf "$tmp_root" 2>/dev/null || true
+  return 0
+}
+
+install_source_fallback() {
+  out="$1"
+  LAST_FALLBACK="source/Python fallback"
+  if [ -n "$VERSION" ]; then
+    if install_source_from_ref "$VERSION" "$out" "tag"; then
+      installed_from="source fallback $VERSION"
+      return 0
+    fi
+    warn "Pinned source fallback failed. Trying main branch source."
+  fi
+  if install_source_from_ref "main" "$out" "branch"; then
+    installed_from="source fallback main"
+    return 0
+  fi
+  return 1
+}
+
+if ! mkdir -p "$PREFIX"; then
+  add_crash_report "PREFIX" "Create install directory" "abort install" "$PREFIX"
+  die "Could not create install directory: $PREFIX"
+fi
 target="$PREFIX/jpg2pdf"
 installed_from=""
 
@@ -263,10 +421,15 @@ else
 fi
 
 if [ -z "$installed_from" ]; then
-  die "Could not install jpg2pdf. Publish a release, run the main-branch build, or set GITHUB_TOKEN if artifact access requires it."
+  warn "No usable binary was available. Falling back to source/Python install."
+  if ! install_source_fallback "$target"; then
+    die "Could not install jpg2pdf. Publish a release, run the main-branch build, install Python, or set GITHUB_TOKEN if artifact access requires it."
+  fi
 fi
 
-chmod +x "$target"
+if ! chmod +x "$target"; then
+  add_crash_report "target chmod" "Finalize install" "continue" "$target"
+fi
 
 if [ "$os" = "macos" ] && command -v xattr >/dev/null 2>&1; then
   xattr -dr com.apple.quarantine "$target" 2>/dev/null || true
@@ -292,6 +455,7 @@ case ":$PATH:" in
     ;;
 esac
 
+write_crash_report_section "installer completed"
 info "Done. Try:"
 printf '    jpg2pdf ~/Pictures --size a4\n'
 printf '    jpg2pdf . --size a4 --style pencil\n'

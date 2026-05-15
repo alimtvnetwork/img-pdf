@@ -46,7 +46,7 @@ trap 'on_error' INT TERM
     release_json=""
   fi
   ```
-- Release → main fallback:
+- Release -> main -> source/Python fallback:
   ```bash
   asset_url=""
   if [ -n "$release_json" ]; then
@@ -56,8 +56,20 @@ trap 'on_error' INT TERM
     warn "No release found, falling back to main-branch artifact..."
     asset_url=$(get_main_branch_artifact_url) || true
   fi
-  [ -n "$asset_url" ] || die "Could not locate jpg2pdf binary."
+  if [ -z "$asset_url" ]; then
+    warn "No binary artifact found, falling back to source/Python install..."
+    install_from_source || true
+  fi
+  [ -n "$asset_url" ] || [ "$installed_from_source" = "1" ] || die "Could not locate jpg2pdf binary or install from source."
   ```
+
+When platform binaries are unavailable (notably macOS while macOS runners are
+disabled), `install.sh` must install from Python source instead of failing. The
+source fallback downloads the repo tarball for the pinned tag or `main`, extracts
+it, runs a best-effort `python -m pip install --user -r tools/jpg2pdf/requirements.txt`,
+and writes an executable wrapper at `$JPG2PDF_PREFIX/jpg2pdf`. Each network,
+archive, Python, pip, copy, and wrapper step must be guarded with `if ...; then`
+style handling and must log the exact fallback used.
 
 ## Debug/verbose flag
 

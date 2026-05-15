@@ -30,7 +30,7 @@ opening 30 images one-by-one, "Print to PDF", merging, repeat.
 | 📐 **Smart sizing** | `a4`, `letter`, `legal` — with `fit cover/contain` and `--orientation`. |
 | ✏️  **Pencil mode** | Faint pencil-on-paper styling with **subtle / normal / extra-visible** depth. |
 | 🪟 **Windows context-menu** | Right-click any folder → *"Combine into PDF"*. One terminal, all files. |
-| 🍎 **macOS / Linux** | Single static binary, ad-hoc signed, drops into `~/.local/bin`. |
+| 🍎 **macOS / Linux** | Drops into `~/.local/bin`; macOS falls back to Python source while binary runners are disabled. |
 | 🔁 **Recursive** | `--recursive` walks subfolders in natural sort order. |
 
 ---
@@ -55,7 +55,7 @@ and registers the Explorer right-click entries. Open a new terminal afterwards.
 ### 🪟 Windows · PowerShell · pin a specific version
 
 ```powershell
-$env:JPG2PDF_VERSION = "v1.3.4"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
+$env:JPG2PDF_VERSION = "v1.3.5"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 ```
 
 ### 🐧 macOS · Linux · Bash
@@ -64,13 +64,13 @@ $env:JPG2PDF_VERSION = "v1.3.4"; irm https://raw.githubusercontent.com/alimtvnet
 curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | bash
 ```
 
-Drops `jpg2pdf` into `~/.local/bin` (override with `JPG2PDF_PREFIX=$HOME/bin`).
+Drops `jpg2pdf` into `~/.local/bin` (override with `JPG2PDF_PREFIX=$HOME/bin`). If no macOS binary exists, the installer downloads the Python source, installs dependencies best-effort, and writes a `jpg2pdf` wrapper instead of failing.
 
 ### 🐧 macOS · Linux · Bash · pin a specific version
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh \
-  | JPG2PDF_VERSION=v1.3.4 JPG2PDF_PREFIX=$HOME/bin bash
+  | JPG2PDF_VERSION=v1.3.5 JPG2PDF_PREFIX=$HOME/bin bash
 ```
 
 If PowerShell blocks scripts, use a process-only bypass for the current shell first:
@@ -189,15 +189,16 @@ img-pdf/
 
 ## 🚢 Cutting a release
 
-Tag & push — GitHub Actions builds binaries for Windows / Linux / macOS
-(x64 + Apple Silicon) and publishes a Release with `SHA256SUMS.txt`:
+Tag & push — GitHub Actions builds binaries for Windows and Linux and publishes
+a Release with `SHA256SUMS.txt`. macOS installs use the Python source fallback
+until macOS runners are restored:
 
 ```bash
-git tag v1.3.4 && git push origin v1.3.4
+git tag v1.3.5 && git push origin v1.3.5
 ```
 
 Released artifacts: `jpg2pdf-windows-x64.exe`, `jpg2pdf-linux-x64`,
-`jpg2pdf-linux-arm64`, `jpg2pdf-macos-x64`, `jpg2pdf-macos-arm64`.
+`jpg2pdf-linux-arm64`.
 
 ---
 

@@ -74,7 +74,7 @@ catch {
 - Release lookup: `try { $release = Get-GitHubJson "$api/releases/latest" } catch { $release = $null }`,
   then `if (-not $release) { # fall back to main-branch artifact }`.
 
-## Release → main-branch fallback (R2 from AI-INSTRUCTIONS)
+## Release -> main-branch -> source/Python fallback (R2 from AI-INSTRUCTIONS)
 
 Pseudo-code that MUST be present:
 
@@ -91,10 +91,19 @@ if (-not $assetUrl) {
   Write-Host "No release found, falling back to main-branch artifact..." -ForegroundColor Yellow
   $assetUrl = Get-MainBranchArtifactUrl -Repo $Repo -AssetName $assetName
 }
-if (-not $assetUrl) { throw "Could not locate jpg2pdf binary in releases or main-branch artifacts." }
+if (-not $assetUrl) {
+  Write-Host "No binary artifact found, falling back to source/Python install..." -ForegroundColor Yellow
+  $ok = Install-FromSource -Repo $Repo -Ref $(if ($Version) { $Version } else { 'main' })
+}
+if (-not $assetUrl -and -not $ok) { throw "Could not locate jpg2pdf binary or install from source." }
 ```
 
-Removing or short-circuiting either fallback is a regression.
+Removing or short-circuiting any fallback is a regression. The source/Python
+fallback must write a small wrapper named `jpg2pdf`/`jpg2pdf.exe` that runs
+`tools/jpg2pdf/src/jpg2pdf.py` with the detected Python executable, after a
+best-effort dependency install. Every source download, extraction, Python
+probe, dependency install, and wrapper write must be inside try/catch and must
+append to the installer crash report on failure.
 
 ## Debug/verbose flag
 

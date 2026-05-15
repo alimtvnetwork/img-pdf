@@ -6,7 +6,7 @@
   irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 
   # Pin a specific version:
-  $env:JPG2PDF_VERSION = "v1.3.4"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
+  $env:JPG2PDF_VERSION = "v1.3.5"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 
   # Skip Explorer context-menu registration:
   $env:JPG2PDF_NO_CONTEXT_MENU = "1"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
@@ -18,7 +18,7 @@
   4. Adds that folder to your User PATH (persistent, no admin).
   5. Downloads + runs register-context-menu.ps1 from the same tag or main (unless disabled).
 #>
-try { $ErrorActionPreference = "Stop" } catch { }
+try { $ErrorActionPreference = "Continue" } catch { }
 
 function Stop-Safely($Message) {
     try { Write-Host "[jpg2pdf] $Message" -ForegroundColor Red } catch { }
@@ -134,13 +134,20 @@ function Write-CrashReportSection($Reason) {
 function Info($m)  { Write-Log "INFO " $m; Write-Host "[jpg2pdf] $m" -ForegroundColor Cyan }
 function Warn($m)  { Write-Log "WARN " $m; Write-Host "[jpg2pdf] $m" -ForegroundColor Yellow }
 function Debug2($m){ Write-Log "DEBUG" $m; if ($script:DebugMode) { Write-Host "[jpg2pdf:debug] $m" -ForegroundColor Magenta } }
-function Die ($m)  {
+    function Die ($m)  {
     Write-CrashReportSection $m
     Write-Log "ERROR" $m
     Write-Host "[jpg2pdf] $m" -ForegroundColor Red
     if ($script:LogFile) { Write-Host "[jpg2pdf] Full log: $script:LogFile" -ForegroundColor Red }
     exit 1
 }
+    function Log-ExternalOutput($Level, $Lines) {
+        try {
+            foreach ($line in @($Lines)) {
+                if ($null -ne $line -and [string]$line -ne "") { Write-Log $Level ([string]$line) }
+            }
+        } catch { }
+    }
 
 function Invoke-Safe($Description, [scriptblock]$Action, $Default = $null) {
     try { return & $Action } catch { Add-CrashReport $Description $Description "default: $Default" $_; Warn "$Description failed safely: $_"; return $Default }
@@ -286,6 +293,62 @@ function Convert-SafeJson($Description, $Raw) {
         return $false
     }
 
+    function Find-PythonCommand() {
+        foreach ($name in @("py", "python", "python3")) {
+            $cmd = Invoke-Safe "Python command lookup $name" { Get-Command $name -ErrorAction Stop } $null
+            if ($cmd) { return $cmd.Source }
+        }
+        Add-CrashReport "python" "Find-PythonCommand" "binary-only install unavailable" "Python was not found on PATH"
+        return $null
+    }
+
+    function Install-SourceFromRef($Repo, $Ref, $RefKind, $OutFile, $BinDir) {
+        $python = Find-PythonCommand
+        if (-not $python) { return $null }
+        $tmpRoot = $null
+        try {
+            $tmpRoot = Join-SafePath (Get-SafeTempDir) ("jpg2pdf-source-" + [guid]::NewGuid().ToString("N"))
+            $zipFile = Join-SafePath $tmpRoot "source.zip"
+            $extractDir = Join-SafePath $tmpRoot "extracted"
+            if (-not (Invoke-SafeBool "Source temp directory creation" { New-Item -ItemType Directory -Force -Path $extractDir -ErrorAction Stop | Out-Null })) { return $null }
+            $sourceUrl = $(if ($RefKind -eq "tag") { "https://github.com/$Repo/archive/refs/tags/$Ref.zip" } else { "https://github.com/$Repo/archive/refs/heads/$Ref.zip" })
+            Info "Downloading source fallback $sourceUrl"
+            if (-not (Save-SafeUrl "Source fallback download" $sourceUrl $zipFile)) { return $null }
+            if (-not (Invoke-SafeBool "Source fallback extraction" { Expand-Archive -Path $zipFile -DestinationPath $extractDir -Force -ErrorAction Stop })) { return $null }
+            $scriptFile = Invoke-Safe "Source fallback script lookup" { Get-ChildItem -LiteralPath $extractDir -Recurse -File -Filter "jpg2pdf.py" -ErrorAction Stop | Where-Object { $_.FullName -like "*tools*jpg2pdf*src*jpg2pdf.py" } | Select-Object -First 1 } $null
+            if (-not $scriptFile) { Add-CrashReport "source tree" "Install-SourceFromRef" "try next fallback" "tools/jpg2pdf/src/jpg2pdf.py not found"; return $null }
+            $sourceRoot = $scriptFile.FullName -replace "[\\/]tools[\\/]jpg2pdf[\\/]src[\\/]jpg2pdf\.py$", ""
+            $installRoot = Join-SafePath $BinDir "jpg2pdf-source"
+            if (Test-SafePath $installRoot) { Invoke-SafeBool "Existing source fallback cleanup" { Remove-Item -LiteralPath $installRoot -Recurse -Force -ErrorAction Stop } | Out-Null }
+            if (-not (Invoke-SafeBool "Source fallback copy" { Copy-Item -LiteralPath $sourceRoot -Destination $installRoot -Recurse -Force -ErrorAction Stop })) { return $null }
+            $requirements = Join-SafePath $installRoot "tools\jpg2pdf\requirements.txt"
+            if (Test-SafePath $requirements) {
+                $pipOutput = Invoke-Safe "Source fallback dependency install" { & $python -m pip install --user -r $requirements 2>&1 } $null
+                Log-ExternalOutput "PIP  " $pipOutput
+                if ($LASTEXITCODE -ne 0) { Add-CrashReport "pip requirements" "Install-SourceFromRef" "write wrapper anyway" "pip exit $LASTEXITCODE"; Warn "Python dependency install failed; writing wrapper anyway. Check the log for pip output." }
+            } else { Add-CrashReport "requirements.txt" "Install-SourceFromRef" "write wrapper without pip" "requirements file missing" }
+            $installedScript = Join-SafePath $installRoot "tools\jpg2pdf\src\jpg2pdf.py"
+            $wrapper = @("@echo off", "`"$python`" `"$installedScript`" %*")
+            if (-not (Invoke-SafeBool "Source fallback wrapper write" { Set-Content -LiteralPath $OutFile -Value $wrapper -Encoding ASCII -ErrorAction Stop })) { return $null }
+            return "source fallback $Ref"
+        } catch {
+            Add-CrashReport "source fallback:$Ref" "Install-SourceFromRef" "try next fallback" $_
+            Warn "Source fallback failed safely: $_"
+            return $null
+        } finally {
+            if ($tmpRoot) { Invoke-SafeBool "Source temp cleanup" { Remove-Item -LiteralPath $tmpRoot -Recurse -Force -ErrorAction Stop } | Out-Null }
+        }
+    }
+
+    function Install-SourceFallback($Repo, $Version, $OutFile, $BinDir) {
+        if ($Version) {
+            $from = Install-SourceFromRef $Repo $Version "tag" $OutFile $BinDir
+            if ($from) { return $from }
+            Warn "Pinned source fallback failed. Trying main branch source."
+        }
+        return (Install-SourceFromRef $Repo "main" "branch" $OutFile $BinDir)
+    }
+
     Invoke-InstallerStep "Resolve install paths" {
         $asset = "jpg2pdf-windows-x64.exe"
         $homeDir = Get-SafeEnv "USERPROFILE"
@@ -293,6 +356,7 @@ function Convert-SafeJson($Description, $Raw) {
         if (-not $homeDir) { try { $homeDir = (Get-Location).Path } catch { Add-CrashReport "Get-Location" "Resolve install paths" "." $_; $homeDir = "." } }
         $binDir  = Join-SafePath $homeDir "Tools\bin"
         $exePath = Join-SafePath $binDir "jpg2pdf.exe"
+        $cmdPath = Join-SafePath $binDir "jpg2pdf.cmd"
     } "install under current directory" -Required | Out-Null
 
     Invoke-InstallerStep "Create install directory" {
@@ -336,7 +400,17 @@ function Convert-SafeJson($Description, $Raw) {
     } "release download -> latest main-branch artifact" | Out-Null
 
     if (-not $installedFrom) {
-        Die "Could not install jpg2pdf. Publish a release, run the main-branch build, or set GITHUB_TOKEN if artifact access requires it."
+        Warn "No usable binary was available. Falling back to source/Python install."
+        if (Test-SafePath $exePath) { Invoke-SafeBool "Remove incomplete binary before source fallback" { Remove-Item -LiteralPath $exePath -Force -ErrorAction Stop } | Out-Null }
+        $sourceFrom = Install-SourceFallback $Repo $Version $cmdPath $binDir
+        if ($sourceFrom) {
+            $installedFrom = $sourceFrom
+            $exePath = $cmdPath
+        }
+    }
+
+    if (-not $installedFrom) {
+        Die "Could not install jpg2pdf. Publish a release, run the main-branch build, install Python, or set GITHUB_TOKEN if artifact access requires it."
     }
 
     Invoke-InstallerStep "Verify installed binary" {

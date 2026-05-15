@@ -18,7 +18,7 @@ irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | i
 Pin a version, or skip the Explorer context-menu:
 
 ```powershell
-$env:JPG2PDF_VERSION = "v1.3.4"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
+$env:JPG2PDF_VERSION = "v1.3.5"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 $env:JPG2PDF_NO_CONTEXT_MENU = "1"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 ```
 
@@ -35,12 +35,13 @@ Options via env vars:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh \
-  | JPG2PDF_VERSION=v1.3.4 JPG2PDF_PREFIX=$HOME/bin sh
+  | JPG2PDF_VERSION=v1.3.5 JPG2PDF_PREFIX=$HOME/bin sh
 ```
 
 Drops `jpg2pdf` into `$HOME/.local/bin` (override with `JPG2PDF_PREFIX`).
 The script tells you the exact `export PATH=...` line to add if that
-folder isn't on `PATH` yet.
+folder isn't on `PATH` yet. If no macOS binary exists, the installer falls
+back to the Python source and writes a `jpg2pdf` wrapper instead of failing.
 
 > **macOS note:** binaries are **ad-hoc signed** (not Apple-notarized).
 > The installer auto-strips `com.apple.quarantine`, so the CLI works
@@ -50,7 +51,7 @@ folder isn't on `PATH` yet.
 
 Prebuilt assets published by `.github/workflows/release.yml`:
 `jpg2pdf-windows-x64.exe`, `jpg2pdf-linux-x64`, `jpg2pdf-linux-arm64`,
-`jpg2pdf-macos-x64`, `jpg2pdf-macos-arm64`, plus `SHA256SUMS.txt`.
+plus `SHA256SUMS.txt`. macOS installs currently use the Python source fallback.
 
 ## Use
 
@@ -83,11 +84,11 @@ python tools/jpg2pdf/src/jpg2pdf.py ./photos --size a4
 
 ## Cutting a release
 
-Tag and push — the workflow builds binaries for Windows / Linux / macOS
-(both x64 and Apple Silicon) and publishes a GitHub Release:
+Tag and push — the workflow builds binaries for Windows and Linux and publishes
+a GitHub Release. macOS is installed from source until macOS runners are restored:
 
 ```bash
-git tag v1.3.4 && git push origin v1.3.4
+git tag v1.3.5 && git push origin v1.3.5
 ```
 
 

@@ -18,18 +18,26 @@
   4. Adds that folder to your User PATH (persistent, no admin).
   5. Downloads + runs register-context-menu.ps1 from the same tag or main (unless disabled).
 #>
-$ErrorActionPreference = "Stop"
+try { $ErrorActionPreference = "Stop" } catch { }
 
 function Stop-Safely($Message) {
     try { Write-Host "[jpg2pdf] $Message" -ForegroundColor Red } catch { }
-    exit 1
+    try { exit 1 } catch { return }
 }
 
 trap {
-    try { Die "Installer failed safely before completion: $_" } catch { Stop-Safely "Installer failed safely before initialization: $_" }
+    try {
+        if (Get-Command Die -ErrorAction SilentlyContinue) { Die "Installer failed safely before completion: $_" }
+        else { Stop-Safely "Installer failed safely before initialization: $_" }
+    } catch { Stop-Safely "Installer failed safely (trap): $_" }
+    continue
 }
 
 try {
+    # Guard $args access -- under `irm | iex` it may be $null in some hosts.
+    $InstallerArgs = @()
+    try { if ($null -ne $args) { $InstallerArgs = @($args) } } catch { $InstallerArgs = @() }
+
     function Get-SafeEnv($Name, $Default = "") {
         try {
             $value = [Environment]::GetEnvironmentVariable($Name)

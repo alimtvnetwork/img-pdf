@@ -293,6 +293,61 @@ function Convert-SafeJson($Description, $Raw) {
         return $false
     }
 
+    function Find-PythonCommand() {
+        foreach ($name in @("py", "python", "python3")) {
+            $cmd = Invoke-Safe "Python command lookup $name" { Get-Command $name -ErrorAction Stop } $null
+            if ($cmd) { return $cmd.Source }
+        }
+        Add-CrashReport "python" "Find-PythonCommand" "binary-only install unavailable" "Python was not found on PATH"
+        return $null
+    }
+
+    function Install-SourceFromRef($Repo, $Ref, $RefKind, $OutFile, $BinDir) {
+        $python = Find-PythonCommand
+        if (-not $python) { return $null }
+        $tmpRoot = $null
+        try {
+            $tmpRoot = Join-SafePath (Get-SafeTempDir) ("jpg2pdf-source-" + [guid]::NewGuid().ToString("N"))
+            $zipFile = Join-SafePath $tmpRoot "source.zip"
+            $extractDir = Join-SafePath $tmpRoot "extracted"
+            if (-not (Invoke-SafeBool "Source temp directory creation" { New-Item -ItemType Directory -Force -Path $extractDir -ErrorAction Stop | Out-Null })) { return $null }
+            $sourceUrl = $(if ($RefKind -eq "tag") { "https://github.com/$Repo/archive/refs/tags/$Ref.zip" } else { "https://github.com/$Repo/archive/refs/heads/$Ref.zip" })
+            Info "Downloading source fallback $sourceUrl"
+            if (-not (Save-SafeUrl "Source fallback download" $sourceUrl $zipFile)) { return $null }
+            if (-not (Invoke-SafeBool "Source fallback extraction" { Expand-Archive -Path $zipFile -DestinationPath $extractDir -Force -ErrorAction Stop })) { return $null }
+            $scriptFile = Invoke-Safe "Source fallback script lookup" { Get-ChildItem -LiteralPath $extractDir -Recurse -File -Filter "jpg2pdf.py" -ErrorAction Stop | Where-Object { $_.FullName -like "*tools*jpg2pdf*src*jpg2pdf.py" } | Select-Object -First 1 } $null
+            if (-not $scriptFile) { Add-CrashReport "source tree" "Install-SourceFromRef" "try next fallback" "tools/jpg2pdf/src/jpg2pdf.py not found"; return $null }
+            $sourceRoot = $scriptFile.FullName -replace "[\\/]tools[\\/]jpg2pdf[\\/]src[\\/]jpg2pdf\.py$", ""
+            $installRoot = Join-SafePath $BinDir "jpg2pdf-source"
+            Invoke-SafeBool "Existing source fallback cleanup" { Remove-Item -LiteralPath $installRoot -Recurse -Force -ErrorAction Stop } | Out-Null
+            if (-not (Invoke-SafeBool "Source fallback copy" { Copy-Item -LiteralPath $sourceRoot -Destination $installRoot -Recurse -Force -ErrorAction Stop })) { return $null }
+            $requirements = Join-SafePath $installRoot "tools\jpg2pdf\requirements.txt"
+            if (Test-SafePath $requirements) {
+                $pipOutput = Invoke-Safe "Source fallback dependency install" { & $python -m pip install --user -r $requirements 2>&1 } $null
+                Log-ExternalOutput "PIP  " $pipOutput
+            } else { Add-CrashReport "requirements.txt" "Install-SourceFromRef" "write wrapper without pip" "requirements file missing" }
+            $installedScript = Join-SafePath $installRoot "tools\jpg2pdf\src\jpg2pdf.py"
+            $wrapper = @("@echo off", "`"$python`" `"$installedScript`" %*")
+            if (-not (Invoke-SafeBool "Source fallback wrapper write" { Set-Content -LiteralPath $OutFile -Value $wrapper -Encoding ASCII -ErrorAction Stop })) { return $null }
+            return "source fallback $Ref"
+        } catch {
+            Add-CrashReport "source fallback:$Ref" "Install-SourceFromRef" "try next fallback" $_
+            Warn "Source fallback failed safely: $_"
+            return $null
+        } finally {
+            if ($tmpRoot) { Invoke-SafeBool "Source temp cleanup" { Remove-Item -LiteralPath $tmpRoot -Recurse -Force -ErrorAction Stop } | Out-Null }
+        }
+    }
+
+    function Install-SourceFallback($Repo, $Version, $OutFile, $BinDir) {
+        if ($Version) {
+            $from = Install-SourceFromRef $Repo $Version "tag" $OutFile $BinDir
+            if ($from) { return $from }
+            Warn "Pinned source fallback failed. Trying main branch source."
+        }
+        return (Install-SourceFromRef $Repo "main" "branch" $OutFile $BinDir)
+    }
+
     Invoke-InstallerStep "Resolve install paths" {
         $asset = "jpg2pdf-windows-x64.exe"
         $homeDir = Get-SafeEnv "USERPROFILE"

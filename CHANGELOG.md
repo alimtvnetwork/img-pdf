@@ -4,6 +4,17 @@ All notable changes to `jpg2pdf` are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-05-15
+
+### Added
+- **Rich GitHub release pages** modeled on the gitmap-v19 layout. Every tag push now publishes a release with a Changelog section, **Release Info** table (version, commit, branch, build date, Python version), **Checksums (SHA256)** block, **Install** snippets (Windows PowerShell quick install, Linux/macOS quick install, pinned-version installers, manual download), and an **Assets** table.
+- `.github/release-notes-template.md` drives the release body; the workflow renders it via Python placeholder substitution.
+- `install.ps1` and `install.sh` are now uploaded as release assets so the "Quick install" URLs in the release body resolve directly from the tag.
+
+### Changed
+- `.github/workflows/release.yml` extracts the matching `## [VERSION]` section from `CHANGELOG.md` instead of relying on `generate_release_notes: true`.
+- Root `README.md` pinned-version examples bumped to `v1.2.0`.
+
 ## [1.1.0] - 2026-05-15
 
 ### Added

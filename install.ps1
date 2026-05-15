@@ -338,14 +338,12 @@ function Convert-SafeJson($Description, $Raw) {
         Die "Could not install jpg2pdf. Publish a release, run the main-branch build, or set GITHUB_TOKEN if artifact access requires it."
     }
 
-    try {
+    Invoke-InstallerStep "Verify installed binary" {
         $verLine = & $exePath --version 2>&1
         Info "Installed from ${installedFrom}: $verLine -> $exePath"
-    } catch {
-        Warn "Binary downloaded from $installedFrom but --version failed: $_"
-    }
+    } "continue after successful download" | Out-Null
 
-    try {
+    Invoke-InstallerStep "Update PATH" {
         $current = [Environment]::GetEnvironmentVariable("Path", "User")
         if (-not $current) { $current = "" }
         $entries = $current.Split(';') | ForEach-Object { $_.Trim().TrimEnd('\') } | Where-Object { $_ }
@@ -360,28 +358,26 @@ function Convert-SafeJson($Description, $Raw) {
         if (($sessionPath.Split(';') | ForEach-Object { $_.Trim().TrimEnd('\') }) -notcontains $resolved) {
             $env:Path = $(if ($sessionPath) { "$($sessionPath.TrimEnd(';'));$resolved" } else { $resolved })
         }
-    } catch {
-        Warn "Installed binary, but PATH update failed safely: $_"
-    }
+    } "binary installed; skip PATH update" | Out-Null
 
-    if (-not $NoContextMenu) {
-        $ctxRef = $(if ($Version) { $Version } else { "main" })
-        $ctxUrl  = "https://raw.githubusercontent.com/$Repo/$ctxRef/tools/jpg2pdf/scripts/register-context-menu.ps1"
-        $ctxFile = Join-SafePath (Get-SafeTempDir) "jpg2pdf-register-context-menu.ps1"
-        try {
+    Invoke-InstallerStep "Register context menu" {
+        if (-not $NoContextMenu) {
+            $ctxRef = $(if ($Version) { $Version } else { "main" })
+            $ctxUrl  = "https://raw.githubusercontent.com/$Repo/$ctxRef/tools/jpg2pdf/scripts/register-context-menu.ps1"
+            $ctxFile = Join-SafePath (Get-SafeTempDir) "jpg2pdf-register-context-menu.ps1"
             Info "Fetching context-menu registrar from $ctxUrl"
             if (Save-SafeUrl "Context-menu registrar download" $ctxUrl $ctxFile) {
                 $null = Invoke-Safe "Context-menu registrar execution" { & powershell -NoProfile -ExecutionPolicy Bypass -File $ctxFile -ExePath $exePath } $null
             }
-        } catch {
-            Warn "Skipped context-menu registration: $_"
         }
-    }
+    } "skip context-menu registration" | Out-Null
 
-    Info "Done. Open a NEW terminal and try:"
-    Write-CrashReportSection "installer completed"
-    Write-Host "    jpg2pdf `"C:\Photos`" --size a4" -ForegroundColor Green
-    Write-Host "    jpg2pdf . --size a4 --style pencil" -ForegroundColor Green
+    Invoke-InstallerStep "Print completion instructions" {
+        Info "Done. Open a NEW terminal and try:"
+        Write-CrashReportSection "installer completed"
+        Write-Host "    jpg2pdf `"C:\Photos`" --size a4" -ForegroundColor Green
+        Write-Host "    jpg2pdf . --size a4 --style pencil" -ForegroundColor Green
+    } "installer completed without final instructions" | Out-Null
 } catch {
     try { Write-CrashReportSection "top-level catch: $_" } catch { }
     try { Die "Installer failed safely: $_" } catch { Stop-Safely "Installer failed safely before logging was initialized: $_" }

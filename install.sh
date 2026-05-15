@@ -21,8 +21,8 @@ info() { printf '\033[36m[jpg2pdf]\033[0m %s\n' "$*"; }
 warn() { printf '\033[33m[jpg2pdf]\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[31m[jpg2pdf]\033[0m %s\n' "$*" >&2; exit 1; }
 on_exit() { code=$?; [ "$code" -eq 0 ] || warn "Installer failed safely before completion (exit $code)."; }
-on_signal() { code=$?; warn "Installer interrupted safely before completion."; exit "$code"; }
-trap on_exit EXIT
+on_signal() { warn "Installer interrupted safely before completion."; exit 1; }
+trap on_exit 0
 trap on_signal HUP INT TERM
 
 set -eu

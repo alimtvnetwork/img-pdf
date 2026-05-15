@@ -108,13 +108,22 @@ jpg2pdf ~/Pictures --size a4
 jpg2pdf .         --size letter --fit cover --out album.pdf
 jpg2pdf .         --size legal  --orientation landscape --recursive
 
+# Mixed selections — images + PDFs + HTML + Word, merged in selection order
+jpg2pdf --files cover.jpg invoice.pdf notes.docx report.html --out bundle.pdf
+
 # Pencil-on-paper styling for scanned notes / faint handwriting
 jpg2pdf ./notes --size a4 --style pencil
-jpg2pdf ./notes --size a4 --style pencil --ask-strength   # pick subtle/normal/extra-visible
+jpg2pdf ./notes --size a4 --style pencil --ask-strength   # live preview, defaults to subtle
 ```
 
-Supported inputs: `.jpg .jpeg .png .webp .bmp .tif .tiff .pdf .html .htm .docx .doc`
-(sorted naturally; mixed selections are merged into one PDF in selection order).
+Supported inputs (sorted naturally; mixed selections merged in order):
+
+| Kind  | Extensions                              | Notes |
+|-------|------------------------------------------|-------|
+| Image | `.jpg .jpeg .png .webp .bmp .tif .tiff` | Honors `--size/--fit/--style/...` |
+| PDF   | `.pdf`                                   | Embedded as-is, page geometry preserved |
+| HTML  | `.html .htm`                             | Rendered via `xhtml2pdf` |
+| Word  | `.docx .doc`                             | Needs MS Word (Windows) or LibreOffice (macOS) |
 
 <div align="center">
   <img src="tools/jpg2pdf/docs/demo.gif" alt="jpg2pdf demo — selecting mixed files and combining into one PDF" width="720"/>
@@ -124,12 +133,14 @@ Supported inputs: `.jpg .jpeg .png .webp .bmp .tif .tiff .pdf .html .htm .docx .
 
 | Mode | When to use |
 | --- | --- |
-| `subtle`         | Already-readable scans you just want to soften. |
-| `normal`         | The default — balanced ink + paper grain. |
+| `subtle`         | **Default.** Gentle softening that keeps paper texture — best for already-readable scans. |
+| `normal`         | Balanced ink + paper grain. |
 | `extra-visible`  | Faint / low-contrast handwriting that needs pop. |
 
-Pick interactively with `--ask-strength`, or pass `--pencil-opacity` /
-`--pencil-ink-darken` for full manual control.
+Pick interactively with `--ask-strength` (live preview, opens with **subtle**
+selected), or pass `--pencil-opacity` / `--pencil-ink-darken` for full manual
+control. Your last choice is saved to `~/.jpg2pdf/config.json` and reused
+automatically next run.
 
 ---
 

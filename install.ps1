@@ -95,6 +95,27 @@ function Die ($m)  {
     exit 1
 }
 
+function Invoke-Safe($Description, [scriptblock]$Action, $Default = $null) {
+    try { return & $Action } catch { Warn "$Description failed safely: $_"; return $Default }
+}
+function Invoke-SafeBool($Description, [scriptblock]$Action) {
+    try { $null = & $Action; return $true } catch { Warn "$Description failed safely: $_"; return $false }
+}
+function Join-SafePath($Base, $Child) {
+    try { if ($Base) { return (Join-Path $Base $Child -ErrorAction Stop) } } catch { Warn "Path join failed safely: $_" }
+    return $Child
+}
+function Test-SafePath($Path) {
+    try { return (Test-Path -LiteralPath $Path -ErrorAction Stop) } catch { Warn "Path test failed safely: $_"; return $false }
+}
+function Resolve-SafePath($Path) {
+    try { return (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path } catch { Warn "Path resolve failed safely: $_"; return $Path }
+}
+function Save-SafeUrl($Description, $Uri, $OutFile) {
+    Debug2 "GET $Uri ($Description)"
+    return Invoke-SafeBool $Description { Invoke-WebRequest -Headers $headers -Uri $Uri -OutFile $OutFile -UseBasicParsing -ErrorAction Stop }
+}
+
     if (-not $Repo) { $Repo = Get-SafeEnv "JPG2PDF_REPO" "alimtvnetwork/img-pdf" }
     if (-not $Version) { $Version = Get-SafeEnv "JPG2PDF_VERSION" }
     if ((Get-SafeEnv "JPG2PDF_NO_CONTEXT_MENU") -eq "1") { $NoContextMenu = $true }

@@ -223,20 +223,21 @@ unpack_artifact() {
     return 1
   fi
   if command -v unzip >/dev/null 2>&1; then
-    unzip -q "$zip_file" -d "$extract_dir"
-    return 0
+    if unzip -q "$zip_file" -d "$extract_dir"; then return 0; fi
+    add_crash_report "unzip" "Artifact extraction" "try python/ditto extraction" "$zip_file"
   fi
   if command -v python3 >/dev/null 2>&1; then
-    python3 - "$zip_file" "$extract_dir" <<'PYC'
+    if python3 - "$zip_file" "$extract_dir" <<'PYC'
 import sys, zipfile
 with zipfile.ZipFile(sys.argv[1]) as zf:
     zf.extractall(sys.argv[2])
 PYC
-    return 0
+    then return 0; fi
+    add_crash_report "python unzip" "Artifact extraction" "try ditto/source fallback" "$zip_file"
   fi
   if [ "$os" = "macos" ] && command -v ditto >/dev/null 2>&1; then
-    ditto -x -k "$zip_file" "$extract_dir"
-    return 0
+    if ditto -x -k "$zip_file" "$extract_dir"; then return 0; fi
+    add_crash_report "ditto" "Artifact extraction" "source/Python fallback" "$zip_file"
   fi
   return 1
 }

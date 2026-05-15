@@ -1,0 +1,19 @@
+{
+  "version": "1.2.0",
+  "branch": "release/v1.2.0",
+  "sourceBranch": "main",
+  "commit": "7df6b1778ddabd945b1a39584b33f38efba3074c",
+  "tag": "v1.2.0",
+  "assets": [],
+  "changelog": [
+    "**Rich GitHub release pages** modeled on the gitmap-v19 layout. Every tag push now publishes a release with a Changelog section, **Release Info** table (version, commit, branch, build date, Python version), **Checksums (SHA256)** block, **Install** snippets (Windows PowerShell quick install, Linux/macOS quick install, pinned-version installers, manual download), and an **Assets** table.",
+    "`.github/release-notes-template.md` drives the release body; the workflow renders it via Python placeholder substitution.",
+    "`install.ps1` and `install.sh` are now uploaded as release assets so the \"Quick install\" URLs in the release body resolve directly from the tag.",
+    "`.github/workflows/release.yml` extracts the matching `## [VERSION]` section from `CHANGELOG.md` instead of relying on `generate_release_notes: true`.",
+    "Root `README.md` pinned-version examples bumped to `v1.2.0`."
+  ],
+  "isDraft": false,
+  "isPreRelease": false,
+  "createdAt": "2026-05-15T03:31:08Z",
+  "isLatest": false
+}

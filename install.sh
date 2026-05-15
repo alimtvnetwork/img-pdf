@@ -120,28 +120,28 @@ else
 fi
 
 try_get() {
-  desc="$1"
-  url="$2"
-  err_file="${TMPDIR:-/tmp}/jpg2pdf-installer-get-$$.err"
-  if out="$(GET "$url" 2>"$err_file")"; then
-    rm -f "$err_file"
-    printf '%s' "$out"
+  tg_desc="$1"
+  tg_url="$2"
+  tg_err_file="${TMPDIR:-/tmp}/jpg2pdf-installer-get-$$.err"
+  if tg_body="$(GET "$tg_url" 2>"$tg_err_file")"; then
+    rm -f "$tg_err_file"
+    printf '%s' "$tg_body"
     return 0
   fi
-  err="$(cat "$err_file" 2>/dev/null || true)"
-  rm -f "$err_file"
-  warn "$desc failed: $err"
+  tg_err="$(cat "$tg_err_file" 2>/dev/null || true)"
+  rm -f "$tg_err_file"
+  warn "$tg_desc failed: $tg_err"
   return 1
 }
 
 try_download() {
-  desc="$1"
-  url="$2"
-  out="$3"
-  if DL "$url" "$out"; then
+  td_desc="$1"
+  td_url="$2"
+  td_dest="$3"
+  if DL "$td_url" "$td_dest"; then
     return 0
   fi
-  warn "$desc failed: $url"
+  warn "$td_desc failed: $td_url"
   return 1
 }
 

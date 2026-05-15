@@ -4,6 +4,13 @@ All notable changes to `jpg2pdf` are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-05-15
+
+### Changed
+- CI/CD: the cross-platform **build matrix** (Windows x64, Linux x64/arm64, macOS x64/arm64) now runs on every push to `main` and every PR — not only on tag pushes. Binaries for all five targets are produced and uploaded as workflow artifacts on every commit, so regressions on any OS are caught immediately.
+- The lightweight `ci` job (linux-x64 build + version-sync check) is now PR-only, since `main` pushes already trigger the full matrix.
+- Publishing to a GitHub Release still happens **only** on `v*` tag pushes or manual `workflow_dispatch` — regular commits build but don't publish.
+
 ## [1.2.0] - 2026-05-15
 
 ### Added

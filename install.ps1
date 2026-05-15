@@ -148,6 +148,17 @@ function Invoke-Safe($Description, [scriptblock]$Action, $Default = $null) {
 function Invoke-SafeBool($Description, [scriptblock]$Action) {
     try { $null = & $Action; return $true } catch { Add-CrashReport $Description $Description "false" $_; Warn "$Description failed safely: $_"; return $false }
 }
+function Invoke-InstallerStep($StepName, [scriptblock]$Action, $Fallback = "continue safely", [switch]$Required) {
+    try {
+        Debug2 "STEP $StepName"
+        return & $Action
+    } catch {
+        Add-CrashReport $StepName $StepName $Fallback $_
+        if ($Required) { Die "$StepName failed safely: $_" }
+        Warn "$StepName failed safely: $_"
+        return $null
+    }
+}
 function Join-SafePath($Base, $Child) {
     try { if ($Base) { return (Join-Path $Base $Child -ErrorAction Stop) } } catch { Add-CrashReport "path:$Base + $Child" "Join-SafePath" "child only: $Child" $_; Warn "Path join failed safely: $_" }
     return $Child

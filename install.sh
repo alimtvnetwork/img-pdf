@@ -150,17 +150,18 @@ download_main_artifact() {
   out="$1"
   info "Looking for latest main-branch artifact named $asset ..."
   runs_json="$(try_get "Main-branch workflow lookup" "$GITHUB_API/repos/$REPO/actions/workflows/release.yml/runs?branch=main&status=success&per_page=10")" || return 1
-  run_ids="$(printf '%s' "$runs_json" | sed -n 's/.*"id":[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -n 10)"
-  [ -n "$run_ids" ] || return 1
+  artifacts_urls="$(printf '%s' "$runs_json" | sed 's/"artifacts_url"/\
+"artifacts_url"/g' | sed -n 's/.*"artifacts_url":[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 10)"
+  [ -n "$artifacts_urls" ] || return 1
 
-  for run_id in $run_ids; do
-    artifacts_json="$(try_get "Artifact lookup for run $run_id" "$GITHUB_API/repos/$REPO/actions/runs/$run_id/artifacts?per_page=100")" || continue
+  for artifacts_url in $artifacts_urls; do
+    artifacts_json="$(try_get "Artifact lookup" "$artifacts_url?per_page=100")" || continue
     artifact_line="$(printf '%s\n' "$artifacts_json" | tr '{' '\n' | grep '"name"[[:space:]]*:[[:space:]]*"'"$asset"'"' | grep -v '"expired"[[:space:]]*:[[:space:]]*true' | head -n 1 || true)"
     [ -n "$artifact_line" ] || continue
     archive_url="$(printf '%s' "$artifact_line" | json_value archive_download_url)"
     [ -n "$archive_url" ] || continue
 
-    tmp_root="${TMPDIR:-/tmp}/jpg2pdf-artifact-$$-$run_id"
+    tmp_root="${TMPDIR:-/tmp}/jpg2pdf-artifact-$$"
     zip_file="$tmp_root/artifact.zip"
     extract_dir="$tmp_root/unzipped"
     rm -rf "$tmp_root"

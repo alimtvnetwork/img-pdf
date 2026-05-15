@@ -2,7 +2,7 @@
 # One-liner installer for jpg2pdf on Linux & macOS.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | bash
 #
 #   # Pin a specific version:
 #   curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | JPG2PDF_VERSION=v1.3.6 sh
@@ -126,7 +126,7 @@ PREFIX="${JPG2PDF_PREFIX:-$DEFAULT_PREFIX}"
 GITHUB_API="https://api.github.com"
 
 if [ -z "$REPO" ]; then
-  die "Set the repo: JPG2PDF_REPO=your-user/your-repo curl ... | sh"
+  die "Set the repo: JPG2PDF_REPO=your-user/your-repo curl ... | bash"
 fi
 
 if ! uname_s="$(uname -s 2>/dev/null)"; then add_crash_report "uname -s" "Platform detection" "unsupported OS" "uname failed"; die "Could not detect OS."; fi

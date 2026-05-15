@@ -28,7 +28,7 @@ and registers Explorer right-click entries. Open a new terminal afterwards.
 ### macOS / Linux (curl)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.sh | bash
 ```
 
 Options via env vars:
@@ -45,7 +45,7 @@ back to the Python source and writes a `jpg2pdf` wrapper instead of failing.
 
 > **macOS note:** binaries are **ad-hoc signed** (not Apple-notarized).
 > The installer auto-strips `com.apple.quarantine`, so the CLI works
-> straight after `curl | sh`. If you download the `.zip` from the
+> straight after `curl | bash`. If you download the `.zip` from the
 > Releases page manually, run once:
 > `xattr -dr com.apple.quarantine ~/.local/bin/jpg2pdf`
 

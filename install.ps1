@@ -401,7 +401,7 @@ function Convert-SafeJson($Description, $Raw) {
 
     if (-not $installedFrom) {
         Warn "No usable binary was available. Falling back to source/Python install."
-        Invoke-SafeBool "Remove incomplete binary before source fallback" { Remove-Item -LiteralPath $exePath -Force -ErrorAction Stop } | Out-Null
+        if (Test-SafePath $exePath) { Invoke-SafeBool "Remove incomplete binary before source fallback" { Remove-Item -LiteralPath $exePath -Force -ErrorAction Stop } | Out-Null }
         $sourceFrom = Install-SourceFallback $Repo $Version $cmdPath $binDir
         if ($sourceFrom) {
             $installedFrom = $sourceFrom

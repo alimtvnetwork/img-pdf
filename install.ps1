@@ -78,10 +78,12 @@ try {
     if ($env:GITHUB_TOKEN) { $headers["Authorization"] = "Bearer $env:GITHUB_TOKEN" }
 
     function Get-GitHubJson($Uri, $Description) {
+        Debug2 "GET $Uri ($Description)"
         try {
             return Invoke-RestMethod -Headers $headers -Uri $Uri -UseBasicParsing
         } catch {
             Warn "$Description failed: $_"
+            Debug2 "Exception: $($_.Exception.GetType().FullName): $($_.Exception.Message)"
             return $null
         }
     }

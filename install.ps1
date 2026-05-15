@@ -106,7 +106,7 @@ function Die ($m)  {
         Info "Debug mode enabled. Log: $(if ($script:LogFile) { $script:LogFile } else { '<unavailable>' })"
         Debug2 "PSVersion: $($PSVersionTable.PSVersion)  OS: $($PSVersionTable.OS)"
         Debug2 "Repo=$Repo  Version=$Version  NoContextMenu=$NoContextMenu"
-        Debug2 "USERPROFILE=$(Get-SafeEnv "USERPROFILE")  TEMP=$(Get-SafeEnv "TEMP")"
+        Debug2 "USERPROFILE=$(Get-SafeEnv 'USERPROFILE')  TEMP=$(Get-SafeEnv 'TEMP')"
     }
 
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12

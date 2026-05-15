@@ -95,9 +95,9 @@ function Die ($m)  {
     exit 1
 }
 
-    if (-not $Repo) { $Repo = $(if ($env:JPG2PDF_REPO) { $env:JPG2PDF_REPO } else { "alimtvnetwork/img-pdf" }) }
-    if (-not $Version) { $Version = $(if ($env:JPG2PDF_VERSION) { $env:JPG2PDF_VERSION } else { "" }) }
-    if ($env:JPG2PDF_NO_CONTEXT_MENU -eq "1") { $NoContextMenu = $true }
+    if (-not $Repo) { $Repo = Get-SafeEnv "JPG2PDF_REPO" "alimtvnetwork/img-pdf" }
+    if (-not $Version) { $Version = Get-SafeEnv "JPG2PDF_VERSION" }
+    if ((Get-SafeEnv "JPG2PDF_NO_CONTEXT_MENU") -eq "1") { $NoContextMenu = $true }
     if (-not $Repo) {
         Die "Set the repo: `$env:JPG2PDF_REPO = 'your-user/your-repo'  (or pass -Repo)."
     }
@@ -106,12 +106,13 @@ function Die ($m)  {
         Info "Debug mode enabled. Log: $(if ($script:LogFile) { $script:LogFile } else { '<unavailable>' })"
         Debug2 "PSVersion: $($PSVersionTable.PSVersion)  OS: $($PSVersionTable.OS)"
         Debug2 "Repo=$Repo  Version=$Version  NoContextMenu=$NoContextMenu"
-        Debug2 "USERPROFILE=$env:USERPROFILE  TEMP=$env:TEMP"
+        Debug2 "USERPROFILE=$(Get-SafeEnv "USERPROFILE")  TEMP=$(Get-SafeEnv "TEMP")"
     }
 
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     $headers = @{ "User-Agent" = "jpg2pdf-installer"; "Accept" = "application/vnd.github+json" }
-    if ($env:GITHUB_TOKEN) { $headers["Authorization"] = "Bearer $env:GITHUB_TOKEN" }
+    $token = Get-SafeEnv "GITHUB_TOKEN"
+    if ($token) { $headers["Authorization"] = "Bearer $token" }
 
     function Get-GitHubJson($Uri, $Description) {
         Debug2 "GET $Uri ($Description)"
@@ -137,12 +138,13 @@ function Die ($m)  {
     }
 
     function Get-SafeTempDir() {
-        if ($env:TEMP) { return $env:TEMP }
+        $safeTemp = Get-SafeEnv "TEMP"
+        if ($safeTemp) { return $safeTemp }
         try {
             $tmp = [System.IO.Path]::GetTempPath()
             if ($tmp) { return $tmp }
         } catch { }
-        return (Get-Location).Path
+        try { return (Get-Location).Path } catch { return "." }
     }
 
     function Download-MainArtifact($Repo, $Asset, $OutFile) {

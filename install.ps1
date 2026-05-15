@@ -273,5 +273,5 @@ function Die ($m)  {
     Write-Host "    jpg2pdf `"C:\Photos`" --size a4" -ForegroundColor Green
     Write-Host "    jpg2pdf . --size a4 --style pencil" -ForegroundColor Green
 } catch {
-    Die "Installer failed safely: $_"
+    try { Die "Installer failed safely: $_" } catch { Stop-Safely "Installer failed safely before logging was initialized: $_" }
 }

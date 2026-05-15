@@ -4,6 +4,16 @@ All notable changes to `jpg2pdf` are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.5] - 2026-05-15
+
+### Added
+- macOS/Linux installer: added a final Python source fallback when no release binary or main-branch artifact is available, so macOS can still install while macOS binary runners are disabled.
+- Installer specs and memory now require the full release -> main artifact -> source/Python fallback chain with crash-report logging.
+
+### Fixed
+- Installers now record guarded failures and the fallback used in a dedicated crash report section instead of exiting without enough diagnostic context.
+- Windows installer now falls back to a Python wrapper install when prebuilt binaries cannot be located.
+
 ## [1.3.4] - 2026-05-15
 
 ### Changed

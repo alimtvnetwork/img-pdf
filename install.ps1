@@ -51,7 +51,7 @@ try {
                 continue
             }
             '^(--no-context-menu|-NoContextMenu)$' { $NoContextMenu = $true; continue }
-            '^(--debug|--verbose|-DebugLog|-Verbose2|-d|-v)$' { $DebugLog = $true; continue }
+            '^(--debug|--verbose|-DebugLog|-Verbose|-Verbose2|-d|-v)$' { $DebugLog = $true; continue }
             default { throw "Unknown installer option: $arg" }
         }
     }

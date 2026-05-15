@@ -4,6 +4,15 @@ All notable changes to `jpg2pdf` are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.8] - 2026-05-15
+
+### Fixed
+- Windows installer: added a guarded environment-read helper and moved repo/version/debug/token/temp/PATH reads through safe fallbacks so host PowerShell profile or environment issues cannot crash before installer error handling.
+- macOS/Linux installer: replaced the remaining direct temp-error-file read with a safe read helper while preserving release-to-main-artifact fallback behavior.
+
+### Changed
+- Root and tool README pinned-version install snippets now reference `v1.2.8`.
+
 ## [1.2.7] - 2026-05-15
 
 ### Fixed

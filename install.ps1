@@ -6,7 +6,7 @@
   irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 
   # Pin a specific version:
-  $env:JPG2PDF_VERSION = "v1.2.7"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
+  $env:JPG2PDF_VERSION = "v1.2.8"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
 
   # Skip Explorer context-menu registration:
   $env:JPG2PDF_NO_CONTEXT_MENU = "1"; irm https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.ps1 | iex
@@ -30,6 +30,14 @@ trap {
 }
 
 try {
+    function Get-SafeEnv($Name, $Default = "") {
+        try {
+            $value = [Environment]::GetEnvironmentVariable($Name)
+            if ($null -ne $value -and [string]$value -ne "") { return [string]$value }
+        } catch { }
+        return $Default
+    }
+
     $Repo = $null
     $Version = $null
     $NoContextMenu = $false
@@ -58,12 +66,14 @@ try {
 
 $script:DebugMode = $false
 if ($DebugLog) { $script:DebugMode = $true }
-if ($env:JPG2PDF_DEBUG -eq "1") { $script:DebugMode = $true }
+if ((Get-SafeEnv "JPG2PDF_DEBUG") -eq "1") { $script:DebugMode = $true }
 
 $script:LogFile = $null
 try {
-    $logBase = if ($env:JPG2PDF_LOG) { $env:JPG2PDF_LOG } else {
-        $tmp = if ($env:TEMP) { $env:TEMP } else { [System.IO.Path]::GetTempPath() }
+    $configuredLog = Get-SafeEnv "JPG2PDF_LOG"
+    $logBase = if ($configuredLog) { $configuredLog } else {
+        $tmp = Get-SafeEnv "TEMP"
+        if (-not $tmp) { $tmp = [System.IO.Path]::GetTempPath() }
         Join-Path $tmp ("jpg2pdf-install-{0}-{1}.log" -f (Get-Date -Format 'yyyyMMdd-HHmmss'), $PID)
     }
     New-Item -ItemType File -Force -Path $logBase | Out-Null
@@ -85,9 +95,9 @@ function Die ($m)  {
     exit 1
 }
 
-    if (-not $Repo) { $Repo = $(if ($env:JPG2PDF_REPO) { $env:JPG2PDF_REPO } else { "alimtvnetwork/img-pdf" }) }
-    if (-not $Version) { $Version = $(if ($env:JPG2PDF_VERSION) { $env:JPG2PDF_VERSION } else { "" }) }
-    if ($env:JPG2PDF_NO_CONTEXT_MENU -eq "1") { $NoContextMenu = $true }
+    if (-not $Repo) { $Repo = Get-SafeEnv "JPG2PDF_REPO" "alimtvnetwork/img-pdf" }
+    if (-not $Version) { $Version = Get-SafeEnv "JPG2PDF_VERSION" }
+    if ((Get-SafeEnv "JPG2PDF_NO_CONTEXT_MENU") -eq "1") { $NoContextMenu = $true }
     if (-not $Repo) {
         Die "Set the repo: `$env:JPG2PDF_REPO = 'your-user/your-repo'  (or pass -Repo)."
     }
@@ -96,12 +106,13 @@ function Die ($m)  {
         Info "Debug mode enabled. Log: $(if ($script:LogFile) { $script:LogFile } else { '<unavailable>' })"
         Debug2 "PSVersion: $($PSVersionTable.PSVersion)  OS: $($PSVersionTable.OS)"
         Debug2 "Repo=$Repo  Version=$Version  NoContextMenu=$NoContextMenu"
-        Debug2 "USERPROFILE=$env:USERPROFILE  TEMP=$env:TEMP"
+        Debug2 "USERPROFILE=$(Get-SafeEnv 'USERPROFILE')  TEMP=$(Get-SafeEnv 'TEMP')"
     }
 
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     $headers = @{ "User-Agent" = "jpg2pdf-installer"; "Accept" = "application/vnd.github+json" }
-    if ($env:GITHUB_TOKEN) { $headers["Authorization"] = "Bearer $env:GITHUB_TOKEN" }
+    $token = Get-SafeEnv "GITHUB_TOKEN"
+    if ($token) { $headers["Authorization"] = "Bearer $token" }
 
     function Get-GitHubJson($Uri, $Description) {
         Debug2 "GET $Uri ($Description)"
@@ -127,12 +138,13 @@ function Die ($m)  {
     }
 
     function Get-SafeTempDir() {
-        if ($env:TEMP) { return $env:TEMP }
+        $safeTemp = Get-SafeEnv "TEMP"
+        if ($safeTemp) { return $safeTemp }
         try {
             $tmp = [System.IO.Path]::GetTempPath()
             if ($tmp) { return $tmp }
         } catch { }
-        return (Get-Location).Path
+        try { return (Get-Location).Path } catch { return "." }
     }
 
     function Download-MainArtifact($Repo, $Asset, $OutFile) {
@@ -178,7 +190,9 @@ function Die ($m)  {
     }
 
     $asset = "jpg2pdf-windows-x64.exe"
-    $homeDir = $(if ($HOME) { $HOME } elseif ($env:USERPROFILE) { $env:USERPROFILE } else { (Get-Location).Path })
+    $homeDir = Get-SafeEnv "USERPROFILE"
+    if (-not $homeDir) { try { if ($HOME) { $homeDir = [string]$HOME } } catch { } }
+    if (-not $homeDir) { try { $homeDir = (Get-Location).Path } catch { $homeDir = "." } }
     $binDir  = Join-Path $homeDir "Tools\bin"
     $exePath = Join-Path $binDir "jpg2pdf.exe"
     New-Item -ItemType Directory -Force -Path $binDir | Out-Null
@@ -223,19 +237,23 @@ function Die ($m)  {
         Warn "Binary downloaded from $installedFrom but --version failed: $_"
     }
 
-    $current = [Environment]::GetEnvironmentVariable("Path", "User")
-    if (-not $current) { $current = "" }
-    $entries = $current.Split(';') | ForEach-Object { $_.Trim().TrimEnd('\') } | Where-Object { $_ }
-    $resolved = (Resolve-Path $binDir).Path.TrimEnd('\')
-    if ($entries -notcontains $resolved) {
-        [Environment]::SetEnvironmentVariable("Path", (($entries + $resolved) -join ';'), "User")
-        Info "Added $resolved to User PATH (open a new terminal to pick it up)."
-    } else {
-        Info "$resolved already on User PATH."
-    }
-    $sessionPath = $(if ($env:Path) { $env:Path } else { "" })
-    if (($sessionPath.Split(';') | ForEach-Object { $_.Trim().TrimEnd('\') }) -notcontains $resolved) {
-        $env:Path = $(if ($sessionPath) { "$($sessionPath.TrimEnd(';'));$resolved" } else { $resolved })
+    try {
+        $current = [Environment]::GetEnvironmentVariable("Path", "User")
+        if (-not $current) { $current = "" }
+        $entries = $current.Split(';') | ForEach-Object { $_.Trim().TrimEnd('\') } | Where-Object { $_ }
+        $resolved = (Resolve-Path $binDir).Path.TrimEnd('\')
+        if ($entries -notcontains $resolved) {
+            [Environment]::SetEnvironmentVariable("Path", (($entries + $resolved) -join ';'), "User")
+            Info "Added $resolved to User PATH (open a new terminal to pick it up)."
+        } else {
+            Info "$resolved already on User PATH."
+        }
+        $sessionPath = Get-SafeEnv "Path"
+        if (($sessionPath.Split(';') | ForEach-Object { $_.Trim().TrimEnd('\') }) -notcontains $resolved) {
+            $env:Path = $(if ($sessionPath) { "$($sessionPath.TrimEnd(';'));$resolved" } else { $resolved })
+        }
+    } catch {
+        Warn "Installed binary, but PATH update failed safely: $_"
     }
 
     if (-not $NoContextMenu) {
@@ -255,5 +273,5 @@ function Die ($m)  {
     Write-Host "    jpg2pdf `"C:\Photos`" --size a4" -ForegroundColor Green
     Write-Host "    jpg2pdf . --size a4 --style pencil" -ForegroundColor Green
 } catch {
-    Die "Installer failed safely: $_"
+    try { Die "Installer failed safely: $_" } catch { Stop-Safely "Installer failed safely before logging was initialized: $_" }
 }

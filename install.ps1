@@ -467,6 +467,7 @@ function Convert-SafeJson($Description, $Raw) {
     Invoke-InstallerStep "Print completion instructions" {
         Info "Done. Open a NEW terminal and try:"
         Write-CrashReportSection "installer completed"
+        if ($script:CrashReports -and $script:CrashReports.Count -gt 0 -and $script:LogFile) { Warn "Diagnostic log: $script:LogFile" }
         Write-Host "    jpg2pdf `"C:\Photos`" --size a4" -ForegroundColor Green
         Write-Host "    jpg2pdf . --size a4 --style pencil" -ForegroundColor Green
     } "installer completed without final instructions" | Out-Null

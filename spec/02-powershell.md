@@ -15,7 +15,7 @@ guarded steps, a top-level failure handler, and a final diagnostic section.
 ASCII only. No em-dashes, smart quotes, arrows, or emoji. If you must include
 UTF-8, save the file with a BOM - but prefer ASCII.
 
-## Bulletproof startup (CRITICAL — this is the bug we keep hitting)
+## Bulletproof startup (CRITICAL - this is the bug we keep hitting)
 
 The install script must NEVER crash before it can print a useful error.
 The first ~30 lines of `install.ps1` MUST follow this template:

@@ -4,6 +4,16 @@ All notable changes to `jpg2pdf` are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.7] - 2026-05-16
+
+### Fixed
+- macOS/Linux source fallback: installs Python dependencies into a local vendor directory first and writes wrappers that include that directory on `PYTHONPATH`, so macOS can run from Python source while binary runners are disabled.
+- Installers now treat post-install `--version` failures as logged diagnostics, not fatal crashes, leaving the installed binary or Python wrapper in place for repair.
+- Verbose logs now preserve guarded crash-report rows outside shell subshells and print the log path when any fallback or verification issue was recorded.
+
+### Changed
+- Installer specs and memory now explicitly require source/Python verification failures to be non-fatal once the wrapper has been installed.
+
 ## [1.3.6] - 2026-05-15
 
 ### Fixed

@@ -4,6 +4,13 @@ All notable changes to `jpg2pdf` are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-05-16
+
+### Fixed
+- GitHub Release body no longer shows literal `\n### Changed\n- ...` escape sequences. Root cause: the workflow piped the changelog through `toJSON(...)` which emits a JSON-encoded string with literal `\n` escapes; bash then assigned that raw to `CHANGELOG` and Python substituted the escaped text verbatim. The changelog body is now passed through the step's `env:` block so real newlines are preserved end-to-end.
+
+See the full history in [CHANGELOG.md](./CHANGELOG.md).
+
 ## [1.4.0] - 2026-05-16
 
 ### Changed

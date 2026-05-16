@@ -293,18 +293,22 @@ function Build-Submenu {
         _add "08_A4_NOAR"   "Convert All to A4 (no auto-rotate)"      '--size a4 --no-auto-rotate "%V"'
         _add "09_A4_PENCIL" "Convert All to A4 (pencil / paper look)" '--size a4 --style pencil --ask-strength "%V"'
     } else {
-        $launcher = 'wscript.exe //B //Nologo "' + $script:SelectedLauncherVbsPath + '" -ExePath "' + $exe + '"'
-        # Explorer can still launch legacy per-file verbs on some file classes.
-        # Route every invocation through a tiny queueing launcher so only the
-        # first process opens a console and runs jpg2pdf once for the full batch.
-        _add "11_A4"        "Combine into PDF (A4)"                         ($launcher + ' -Size a4 %*')                             -MultiSelect -RawCommand
-        _add "12_Letter"    "Combine into PDF (Letter)"                     ($launcher + ' -Size letter %*')                         -MultiSelect -RawCommand
-        _add "13_Legal"     "Combine into PDF (Legal)"                      ($launcher + ' -Size legal %*')                          -MultiSelect -RawCommand
-        _add "15_A4_CW"     "Combine into PDF (A4, rotate 90 CW)"           ($launcher + ' -Size a4 -Rotate 270 %*')                 -MultiSelect -RawCommand
-        _add "16_A4_CCW"    "Combine into PDF (A4, rotate 90 CCW)"          ($launcher + ' -Size a4 -Rotate 90 %*')                  -MultiSelect -RawCommand
-        _add "17_A4_180"    "Combine into PDF (A4, rotate 180)"             ($launcher + ' -Size a4 -Rotate 180 %*')                 -MultiSelect -RawCommand
-        _add "18_A4_NOAR"   "Combine into PDF (A4, no auto-rotate)"         ($launcher + ' -Size a4 -NoAutoRotate %*')               -MultiSelect -RawCommand
-        _add "19_A4_PENCIL" "Combine into PDF (A4, pencil / paper look)"    ($launcher + ' -Size a4 -Style pencil %*')               -MultiSelect -RawCommand
+        # Direct cmd.exe invocation: opens a visible console, runs jpg2pdf
+        # once on all selected files (MultiSelectModel=Player on each leaf),
+        # and pauses on non-zero exit so users can read errors. No VBS/launcher
+        # indirection — that chain silently failed on some hosts (ExecutionPolicy
+        # GPO, AV blocking temp .cmd, hidden Start-Process not surfacing a console)
+        # which made "nothing happen" when clicking the menu.
+        $prefix = 'cmd.exe /c "title jpg2pdf & "' + $exe + '"'
+        $suffix = ' & if errorlevel 1 pause"'
+        _add "11_A4"        "Combine into PDF (A4)"                         ($prefix + ' --size a4 --files %*' + $suffix)                             -MultiSelect -RawCommand
+        _add "12_Letter"    "Combine into PDF (Letter)"                     ($prefix + ' --size letter --files %*' + $suffix)                         -MultiSelect -RawCommand
+        _add "13_Legal"     "Combine into PDF (Legal)"                      ($prefix + ' --size legal --files %*' + $suffix)                          -MultiSelect -RawCommand
+        _add "15_A4_CW"     "Combine into PDF (A4, rotate 90 CW)"           ($prefix + ' --size a4 --rotate 270 --files %*' + $suffix)                -MultiSelect -RawCommand
+        _add "16_A4_CCW"    "Combine into PDF (A4, rotate 90 CCW)"          ($prefix + ' --size a4 --rotate 90 --files %*' + $suffix)                 -MultiSelect -RawCommand
+        _add "17_A4_180"    "Combine into PDF (A4, rotate 180)"             ($prefix + ' --size a4 --rotate 180 --files %*' + $suffix)                -MultiSelect -RawCommand
+        _add "18_A4_NOAR"   "Combine into PDF (A4, no auto-rotate)"         ($prefix + ' --size a4 --no-auto-rotate --files %*' + $suffix)            -MultiSelect -RawCommand
+        _add "19_A4_PENCIL" "Combine into PDF (A4, pencil / paper look)"    ($prefix + ' --size a4 --style pencil --ask-strength --files %*' + $suffix) -MultiSelect -RawCommand
     }
 }
 

@@ -4,6 +4,13 @@ All notable changes to `jpg2pdf` are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2026-05-16
+
+### Fixed
+- Selected-files context menu actions ("Combine into PDF (A4)", "...pencil/paper look", etc.) now actually run. Root cause: the previous registration routed every invocation through a hidden VBS -> hidden PowerShell launcher -> mutex/queue -> `Start-Process` of a generated `.cmd`. On common hosts (ExecutionPolicy locked by GPO, AV blocking temp `.cmd`, hidden PowerShell not surfacing a console) the entire chain silently failed and "nothing happened" when clicking the menu. Replaced with a direct `cmd.exe /c` command per leaf verb with `MultiSelectModel=Player`, so Explorer opens a single visible console and runs `jpg2pdf --files %*` once. Pencil's `--ask-strength` prompt is now interactive again.
+
+See the full history in [CHANGELOG.md](./CHANGELOG.md).
+
 ## [1.4.1] - 2026-05-16
 
 ### Fixed

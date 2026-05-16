@@ -21,6 +21,6 @@ Independent of `jpg2pdf` itself. Currently `RunPs1Version = "0.3.0"`. Bump when 
 
 ## Current state (2026-05-16)
 
-- jpg2pdf: `1.4.1` (not yet tagged; pending installer smoke tests).
+- jpg2pdf: `1.4.2` (not yet tagged; pending installer smoke tests).
 - run.ps1: `0.3.0`.
 - Last published tag in release map: `v1.3.4` (per `.gitmap/release/`).

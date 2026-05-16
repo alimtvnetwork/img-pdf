@@ -1,0 +1,15 @@
+{
+  "version": "1.4.0",
+  "branch": "release/v1.4.0",
+  "sourceBranch": "main",
+  "commit": "38cb9402af5a0d04a5f13c099004f6960cf59dee",
+  "tag": "v1.4.0",
+  "assets": [],
+  "changelog": [
+    "Version bump to 1.4.0. Includes the release-notes template cleanup (dynamic `{{REPO}}`, single-line install per platform, link to full CHANGELOG.md at tag) previously staged under 1.3.8."
+  ],
+  "isDraft": false,
+  "isPreRelease": false,
+  "createdAt": "2026-05-16T03:00:12Z",
+  "isLatest": false
+}

@@ -66,6 +66,8 @@ curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/img-pdf/main/install.
 
 Drops `jpg2pdf` into `~/.local/bin` (override with `JPG2PDF_PREFIX=$HOME/bin`). If no macOS binary exists, the installer downloads the Python source, installs dependencies best-effort, and writes a `jpg2pdf` wrapper instead of failing.
 
+For installer diagnostics, add `--debug` or `JPG2PDF_DEBUG=1`. The installer prints a `jpg2pdf-install-*.log` path and leaves any Python fallback wrapper in place even if dependency verification fails.
+
 ### 🐧 macOS · Linux · Bash · pin a specific version
 
 ```bash

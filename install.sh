@@ -397,7 +397,8 @@ install_source_from_ref() {
   if ! cat > "$is_out" <<EOF
 #!/usr/bin/env sh
 if [ -d "$vendor_dir" ]; then
-  PYTHONPATH="$vendor_dir").
+  PYTHONPATH="$vendor_dir\${PYTHONPATH:+:\$PYTHONPATH}"
+  export PYTHONPATH
 fi
 exec "$py_cmd" "$script_path" "\$@"
 EOF

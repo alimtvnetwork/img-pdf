@@ -35,4 +35,4 @@ Update root `README.md` and `tools/jpg2pdf/README.md` pinned-version examples to
 
 ## Release index
 
-`.gitmap/release/*.json` tracks past releases. Latest known in code: `v1.2.2`.
+`.gitmap/release/*.json` tracks past releases. Latest known in code: `v1.3.4`.

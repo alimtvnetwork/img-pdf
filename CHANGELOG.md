@@ -4,6 +4,13 @@ All notable changes to `jpg2pdf` are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.8] - 2026-05-16
+
+### Changed
+- Release notes template: replaced the three-line "generic installer" snippets with a single one-liner per platform that resolves the repo via the workflow's `{{REPO}}` placeholder (no hardcoded URLs from other projects).
+- Release notes now link to the full [CHANGELOG.md](./CHANGELOG.md) at the released tag instead of inlining install variants.
+- Dropped macOS rows from the release assets table since macOS binary runners are disabled; macOS users install via `install.sh` Python fallback.
+
 ## [1.3.7] - 2026-05-16
 
 ### Fixed
